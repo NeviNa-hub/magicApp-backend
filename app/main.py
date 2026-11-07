@@ -1,4 +1,4 @@
-"""FastAPI 应用入口及统一请求处理。"""
+"""FastAPI 应用入口：注册路由、中间件和全局异常处理。"""
 
 import logging
 from uuid import uuid4
@@ -15,6 +15,7 @@ from app.core.responses import ApiResponse
 setup_logging()
 logger = logging.getLogger(__name__)
 app = FastAPI(title="MagicApp API", version="0.1.0")
+# 统一挂载 /api 前缀，具体路径由各功能路由定义。
 app.include_router(api_router, prefix="/api")
 
 
@@ -22,6 +23,7 @@ app.include_router(api_router, prefix="/api")
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     """为请求附加追踪编号，只记录路径和状态，不记录敏感内容。"""
+    # 请求方传入追踪编号时沿用，否则由服务端生成，便于串联排查日志。
     request_id = request.headers.get("X-Request-ID") or str(uuid4())
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
@@ -54,12 +56,22 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
         field = error.get("loc", [None])[-1]
         error_type = error.get("type")
 
-        if field == "username" and error_type == "string_too_short":
-            messages.append("账号需为 3–64 位英文字母、数字或下划线")
+        if field == "username" and error_type == "missing":
+            messages.append("请填写用户名")
+        elif field == "username" and error_type == "string_too_short":
+            messages.append("用户名不能为空")
         elif field == "username" and error_type == "string_too_long":
+            messages.append("用户名不能超过 64 个字符")
+        elif field == "account" and error_type == "missing":
+            messages.append("请填写账号")
+        elif field == "account" and error_type in {
+            "string_too_short",
+            "string_too_long",
+            "string_pattern_mismatch",
+        }:
             messages.append("账号需为 3–64 位英文字母、数字或下划线")
-        elif field == "username" and error_type == "string_pattern_mismatch":
-            messages.append("账号需为 3–64 位英文字母、数字或下划线")
+        elif field == "password" and error_type == "missing":
+            messages.append("请填写密码")
         elif field == "password" and error_type == "string_too_short":
             messages.append("密码需为 8–128 位")
         elif field == "password" and error_type == "string_too_long":
@@ -78,6 +90,7 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
 @app.exception_handler(Exception)
 async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
     """服务端记录异常详情，客户端只收到通用错误信息。"""
+    # 详细异常只写入服务端日志，响应不给调用方暴露堆栈或数据库信息。
     request_id = request.headers.get("X-Request-ID", "unknown")
     logger.exception("request_id=%s unhandled_error=%s", request_id, type(exc).__name__)
     body = ApiResponse(code=50001, message="服务异常，请稍后重试", data=None)

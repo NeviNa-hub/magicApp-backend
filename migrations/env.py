@@ -1,4 +1,4 @@
-"""Alembic environment configured from application settings."""
+"""Alembic 迁移入口：读取应用数据库配置，并加载全部模型元数据。"""
 
 from logging.config import fileConfig
 
@@ -14,12 +14,13 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 settings = get_settings()
+# 数据库连接串从应用配置读取，避免迁移工具和 API 使用不同数据库。
 config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Render migration SQL without opening a database connection."""
+    """只生成迁移 SQL，不建立数据库连接。"""
     context.configure(
         url=settings.database_url,
         target_metadata=target_metadata,
@@ -31,7 +32,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations using a short-lived SQLAlchemy engine."""
+    """连接配置的数据库并执行尚未应用的迁移。"""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

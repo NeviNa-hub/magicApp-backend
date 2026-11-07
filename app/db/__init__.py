@@ -1,1 +1,1 @@
-"""Database engine, session, and model definitions."""
+"""数据库包：连接会话和模型定义所在位置。"""

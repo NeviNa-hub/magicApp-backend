@@ -1,4 +1,4 @@
-"""集中导入模型，供数据库迁移读取完整表结构。"""
+"""集中导入全部模型；Alembic 依赖这些导入发现完整表结构。"""
 
 from app.db.models.account import Account, PointLedger
 from app.db.models.asset import Asset

@@ -1,1 +1,1 @@
-"""Versioned API route modules."""
+"""HTTP 路由包：按功能拆分接口。"""

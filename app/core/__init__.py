@@ -1,1 +1,1 @@
-"""Application configuration and shared infrastructure."""
+"""核心配置和通用基础能力所在位置。"""

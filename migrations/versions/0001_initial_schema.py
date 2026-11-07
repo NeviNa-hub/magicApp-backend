@@ -1,4 +1,4 @@
-"""创建初始业务表结构。"""
+"""第一版数据库结构：创建用户、会话、余额、文件、任务和作品表。"""
 
 from collections.abc import Sequence
 
@@ -152,7 +152,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop tables in dependency order."""
+    """按外键依赖的反方向删除表，供回退迁移使用。"""
     op.drop_table("works")
     op.drop_table("generation_tasks")
     op.drop_table("assets")

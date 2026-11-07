@@ -1,4 +1,4 @@
-"""精简用户表，只保留账号和密码哈希。"""
+"""第二版数据库结构：用户表精简为主键、账号和密码哈希。"""
 
 from collections.abc import Sequence
 

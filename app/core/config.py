@@ -1,4 +1,4 @@
-"""读取开发或服务器环境中的服务配置。"""
+"""读取开发或服务器环境配置；敏感配置由环境变量或未提交的 .env 提供。"""
 
 from functools import lru_cache
 
@@ -16,10 +16,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp"
     database_connect_timeout: int = 3
 
+    # 环境变量优先于 .env；extra=ignore 允许部署环境存在其他无关变量。
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache
 def get_settings() -> Settings:
     """读取并缓存服务配置。"""
+    # 配置在进程内通常固定，缓存可避免重复解析配置文件。
     return Settings()

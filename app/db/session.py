@@ -1,4 +1,4 @@
-"""创建数据库连接，并为每个请求提供独立会话。"""
+"""创建数据库引擎和请求级会话，供路由通过依赖注入使用。"""
 
 from collections.abc import Generator
 
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import get_settings
 
 settings = get_settings()
+# 引擎复用连接池；每个请求单独创建 Session，避免跨请求共享事务状态。
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
@@ -23,4 +24,5 @@ def get_db() -> Generator[Session, None, None]:
     try:
         yield session
     finally:
+        # 无论请求成功或异常都关闭会话，释放连接回连接池。
         session.close()
