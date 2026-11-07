@@ -25,6 +25,8 @@ async def add_request_id(request: Request, call_next):
     """为请求附加追踪编号，只记录路径和状态，不记录敏感内容。"""
     # 请求方传入追踪编号时沿用，否则由服务端生成，便于串联排查日志。
     request_id = request.headers.get("X-Request-ID") or str(uuid4())
+    # 存入 request.state，异常处理器才能拿到与响应头一致的编号。
+    request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     logger.info(
@@ -91,7 +93,12 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
 async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
     """服务端记录异常详情，客户端只收到通用错误信息。"""
     # 详细异常只写入服务端日志，响应不给调用方暴露堆栈或数据库信息。
-    request_id = request.headers.get("X-Request-ID", "unknown")
-    logger.exception("request_id=%s unhandled_error=%s", request_id, type(exc).__name__)
+    request_id = getattr(request.state, "request_id", None) or request.headers.get(
+        "X-Request-ID", "unknown"
+    )
+    # 异常处理器内没有活动异常上下文，必须显式传入 exc_info 才会记录堆栈。
+    logger.error(
+        "request_id=%s unhandled_error=%s", request_id, type(exc).__name__, exc_info=exc
+    )
     body = ApiResponse(code=50001, message="服务异常，请稍后重试", data=None)
     return JSONResponse(status_code=500, content=body.model_dump())

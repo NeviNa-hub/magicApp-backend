@@ -200,7 +200,7 @@ curl http://127.0.0.1:8001/api/health
 curl http://127.0.0.1:8001/api/ready
 ```
 
-两个接口都应返回 `code: 0`；数据库检查的 `data.database` 应为 `ok`。接口文档在
+两个接口都应返回 `code: 200`；数据库检查的 `data.database` 应为 `ok`。接口文档在
 `http://127.0.0.1:8001/docs`，只在服务器本机或安全隧道中访问。
 
 ### 后续更新

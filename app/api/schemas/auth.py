@@ -1,16 +1,20 @@
 """注册接口的数据格式：分别校验用户名、登录账号和密码。"""
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
+
 
 
 # 注册接口数据格式
 class RegisterInput(BaseModel):
     """注册接口接收的用户名、登录账号和密码。"""
 
-    # Field 设置字段校验；用户名校验前会去掉首尾空格。
-    username: str = Field(min_length=1, max_length=64, strip_whitespace=True)
+    username: str = Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
+    ]
     account: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_]+$")
     password: str = Field(min_length=8, max_length=128)
 
