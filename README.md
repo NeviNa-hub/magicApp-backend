@@ -14,11 +14,11 @@
 
 ## 本机开发
 
-需要 Python 3.12 或更新版本。首次在 PowerShell 配置：
+需要 Python 3.10 或更新版本。首次在 PowerShell 配置：
 
 ```powershell
 cd D:\GZHU\HBuilderProjects\magicApp-backend-main\magicApp-backend-main
-py -3.12 -m venv .venv
+py -3.10 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .
 ```
@@ -34,34 +34,83 @@ python -m pip install -e .
 `git@github.com:NeviNa-hub/magicApp-backend.git` 执行下方 clone 命令。不要把 GitHub Token
 写进命令、脚本或 `.env`。
 
-服务器项目目录使用 `/home/NBN/NBN/agent/magicApp-backend-main`。首次部署前，需要服务器
-管理员在现有 PostgreSQL 中创建独立的 `magicapp` 数据库和 `magicapp` 登录账号。不要使用
-`weekend_planner` 数据库或账号，也不要开放数据库端口给公网。
+服务器项目目录为 `/home/NBN/NBN/agent/magicApp-backend-main`。API 在服务器运行，连接
+同一台服务器上的 PostgreSQL；MagicApp 使用独立的 `magicapp` 数据库和账号。
 
 ### 首次部署
 
-在服务器 SSH 终端执行：
+后端使用名为 `magicAppEnv` 的独立 Python 虚拟环境；服务器需安装 Python 3.10 和 `venv`。
+
+进入服务器项目父目录：
 
 ```bash
-sudo mkdir -p /home/NBN/NBN/agent/magicAppDB
-sudo chown "$USER":"$USER" /home/NBN/NBN/agent/magicAppDB
-sudo useradd --system --home-dir /home/NBN/NBN/agent/magicApp-backend-main --shell /usr/sbin/nologin magicapp 2>/dev/null || true
 cd /home/NBN/NBN/agent
-if [ -d magicApp-backend-main/.git ]; then
-  cd magicApp-backend-main
-  git pull --ff-only origin main
-else
-  git clone git@github.com:NeviNa-hub/magicApp-backend.git magicApp-backend-main
-  cd magicApp-backend-main
-fi
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install -e .
+```
+
+首次部署时从 GitHub 克隆后端仓库：
+
+```bash
+git clone git@github.com:NeviNa-hub/magicApp-backend.git magicApp-backend-main
+```
+
+后续发布时从 GitHub 拉取最新代码：
+
+```bash
+cd /home/NBN/NBN/agent/magicApp-backend-main && git pull --ff-only origin main
+```
+
+进入后端项目目录：
+
+```bash
+cd /home/NBN/NBN/agent/magicApp-backend-main
+```
+
+创建名为 `magicAppEnv` 的 Python 虚拟环境：
+
+```bash
+python3.10 -m venv magicAppEnv
+```
+
+激活虚拟环境；后续 `python` 和 `pip` 命令会使用 `magicAppEnv` 中的程序：
+
+```bash
+source magicAppEnv/bin/activate
+```
+
+在虚拟环境中升级 pip：
+
+```bash
+python -m pip install --upgrade pip
+```
+
+安装后端依赖：
+
+```bash
+python -m pip install -e .
+```
+
+复制服务器配置模板；若 `.env` 已存在，跳过此命令以免覆盖：
+
+```bash
 cp .env.example .env
-sudo chown magicapp:magicapp .env
-sudo chmod 600 .env
-sudo chown -R magicapp:magicapp /home/NBN/NBN/agent/magicApp-backend-main
+```
+
+限制服务器配置文件权限，避免其他系统用户读取数据库密码：
+
+```bash
+chmod 600 .env
+```
+
+编辑服务器专用配置：
+
+```bash
 nano .env
+```
+
+退出虚拟环境；不激活时可用 `magicAppEnv/bin/命令` 直接运行环境中的程序：
+
+```bash
+deactivate
 ```
 
 在 `.env` 中设置服务器专用配置：
@@ -75,36 +124,39 @@ DATABASE_URL=postgresql+psycopg://magicapp:你的数据库密码@127.0.0.1:5432/
 DATABASE_CONNECT_TIMEOUT=3
 ```
 
-把数据库密码替换为你创建 PostgreSQL 用户时设置的密码。该账号密码只用于 MagicApp，不能
-复用服务器 root 密码。保存退出 nano：按 `Ctrl+O`、回车，再按 `Ctrl+X`。
+把数据库密码替换为 MagicApp PostgreSQL 账号的密码，不要使用服务器 root 密码。保存退出
+nano：按 `Ctrl+O`、回车，再按 `Ctrl+X`。
 
 ### 数据库准备
 
-如果 MagicApp 数据库和账号还未创建，由服务器管理员执行：
+如果 MagicApp 数据库和账号还未创建，以 root 身份执行以下命令。第一条会提示设置数据库
+密码；若数据库或账号已存在，先检查，不要重复创建。不要使用 `weekend_planner` 数据库。
 
 ```bash
-sudo -u postgres createuser --login --pwprompt magicapp
-sudo -u postgres createdb --owner=magicapp --encoding=UTF8 magicapp
-sudo -u postgres psql -d magicapp -c 'GRANT ALL ON SCHEMA public TO magicapp'
+runuser -u postgres -- createuser --login --pwprompt magicapp
+runuser -u postgres -- createdb --owner=magicapp --encoding=UTF8 magicapp
+runuser -u postgres -- psql -d magicapp -c 'GRANT ALL ON SCHEMA public TO magicapp'
 ```
 
-命令会交互式询问并设置数据库密码。若账号或数据库已存在，不要重复创建；先用
-`sudo -u postgres psql -l` 和 `sudo -u postgres psql -c '\\du'` 检查。
-
-应用初始表结构：
+查看现有数据库，确认 `magicapp` 已创建：
 
 ```bash
-cd /home/NBN/NBN/agent/magicApp-backend-main
-.venv/bin/alembic upgrade head
+runuser -u postgres -- psql -l
+```
+
+在 MagicApp 数据库中创建或升级数据表：
+
+```bash
+cd /home/NBN/NBN/agent/magicApp-backend-main && magicAppEnv/bin/alembic upgrade head
 ```
 
 ### 用 systemd 启动 API
 
-API 只监听服务器本机 `127.0.0.1:8001`，不会占用 Planner 使用的 8000 端口，也不应直接
-开放给公网。创建服务文件：
+API 只监听本机 `127.0.0.1:8001`，不会占用 Planner 使用的 8000 端口。以 root 身份创建
+systemd 服务文件：
 
 ```bash
-sudo nano /etc/systemd/system/magicapp-api.service
+nano /etc/systemd/system/magicapp-api.service
 ```
 
 写入以下内容：
@@ -116,10 +168,9 @@ After=network.target postgresql.service
 
 [Service]
 Type=simple
-User=magicapp
 WorkingDirectory=/home/NBN/NBN/agent/magicApp-backend-main
 EnvironmentFile=/home/NBN/NBN/agent/magicApp-backend-main/.env
-ExecStart=/home/NBN/NBN/agent/magicApp-backend-main/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
+ExecStart=/home/NBN/NBN/agent/magicApp-backend-main/magicAppEnv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
 Restart=on-failure
 RestartSec=3
 
@@ -130,16 +181,16 @@ WantedBy=multi-user.target
 保存后启用并启动：
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now magicapp-api
-sudo systemctl status magicapp-api --no-pager
+systemctl daemon-reload
+systemctl enable --now magicapp-api
+systemctl status magicapp-api --no-pager
 ```
 
 查看日志：
 
 ```bash
-sudo journalctl -u magicapp-api -n 100 --no-pager
-sudo journalctl -u magicapp-api -f
+journalctl -u magicapp-api -n 100 --no-pager
+journalctl -u magicapp-api -f
 ```
 
 验证 API 和数据库：
@@ -162,15 +213,14 @@ git commit -m "后端功能说明"
 git push origin main
 ```
 
-然后在服务器更新并重启：
+然后在服务器更新代码、同步依赖、应用迁移并重启 API：
 
 ```bash
-cd /home/NBN/NBN/agent/magicApp-backend-main
-git pull --ff-only origin main
-.venv/bin/pip install -e .
-.venv/bin/alembic upgrade head
-sudo systemctl restart magicapp-api
-sudo systemctl status magicapp-api --no-pager
+cd /home/NBN/NBN/agent/magicApp-backend-main && git pull --ff-only origin main
+magicAppEnv/bin/pip install -e .
+magicAppEnv/bin/alembic upgrade head
+systemctl restart magicapp-api
+systemctl status magicapp-api --no-pager
 curl http://127.0.0.1:8001/api/ready
 ```
 

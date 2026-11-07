@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="MagicApp API", version="0.1.0")
 app.include_router(api_router, prefix="/api")
 
+
 # 全局请求中间件
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
@@ -33,6 +34,7 @@ async def add_request_id(request: Request, call_next):
     )
     return response
 
+
 # 全局异常处理
 @app.exception_handler(ApiError)
 async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
@@ -40,6 +42,7 @@ async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
     del request
     body = ApiResponse(code=exc.code, message=exc.message, data=None)
     return JSONResponse(status_code=exc.status_code, content=body.model_dump())
+
 
 # 全局参数校验异常处理
 @app.exception_handler(RequestValidationError)
@@ -50,6 +53,7 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
     message = f"参数校验失败：{fields}" if fields else "参数校验失败"
     body = ApiResponse(code=42201, message=message, data=None)
     return JSONResponse(status_code=422, content=body.model_dump())
+
 
 # 全局未处理异常处理
 @app.exception_handler(Exception)
