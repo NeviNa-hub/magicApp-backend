@@ -8,7 +8,7 @@ from pydantic import BaseModel
 class ApiResponse(BaseModel):
     """统一接口返回的状态码、提示和数据字段。"""
 
-    code: int = 0
+    code: int = 200
     message: str = "操作成功"
     data: Any = None
 
