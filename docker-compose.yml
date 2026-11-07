@@ -1,0 +1,20 @@
+services:
+  # 本地开发时可单独启动数据库；服务器已有 PostgreSQL，不要启动这个容器。
+  postgres:
+    image: postgres:16-alpine
+    container_name: magicapp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: magicapp
+      POSTGRES_USER: magicapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      # 只允许本机连接数据库，不向局域网或公网开放端口。
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U magicapp -d magicapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

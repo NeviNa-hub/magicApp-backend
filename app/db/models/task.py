@@ -1,0 +1,29 @@
+"""定义异步生成任务及其处理结果。"""
+
+from typing import Any
+
+from sqlalchemy import JSON, BigInteger, CheckConstraint, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+from app.db.models.base import TimestampMixin
+
+
+class GenerationTask(TimestampMixin, Base):
+    """保存任务状态、输入、结果和失败原因。"""
+
+    __tablename__ = "generation_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    task_type: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(24), index=True)
+    input_data: Mapped[dict[str, Any]] = mapped_column(JSON)
+    result_data: Mapped[dict[str, Any] | list[Any] | None] = mapped_column(JSON)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    cost_points: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+
+    __table_args__ = (
+        CheckConstraint("cost_points >= 0", name="ck_generation_tasks_nonnegative_cost"),
+    )
