@@ -47,10 +47,29 @@ async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
 # 全局参数校验异常处理
 @app.exception_handler(RequestValidationError)
 async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """返回简洁的参数错误，不回显用户提交的内容。"""
+    """把常见字段校验错误转换成中文提示，不回显用户提交的内容。"""
     del request
-    fields = ", ".join(str(error["loc"][-1]) for error in exc.errors() if error.get("loc"))
-    message = f"参数校验失败：{fields}" if fields else "参数校验失败"
+    messages = []
+    for error in exc.errors():
+        field = error.get("loc", [None])[-1]
+        error_type = error.get("type")
+
+        if field == "username" and error_type == "string_too_short":
+            messages.append("账号需为 3–64 位英文字母、数字或下划线")
+        elif field == "username" and error_type == "string_too_long":
+            messages.append("账号需为 3–64 位英文字母、数字或下划线")
+        elif field == "username" and error_type == "string_pattern_mismatch":
+            messages.append("账号需为 3–64 位英文字母、数字或下划线")
+        elif field == "password" and error_type == "string_too_short":
+            messages.append("密码需为 8–128 位")
+        elif field == "password" and error_type == "string_too_long":
+            messages.append("密码需为 8–128 位")
+        elif field:
+            messages.append(f"{field} 格式不正确")
+        else:
+            messages.append("请求参数格式不正确")
+
+    message = "；".join(dict.fromkeys(messages)) or "请求参数格式不正确"
     body = ApiResponse(code=42201, message=message, data=None)
     return JSONResponse(status_code=422, content=body.model_dump())
 
