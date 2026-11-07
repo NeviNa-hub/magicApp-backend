@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
     app_log_level: str = "INFO"
     database_url: str = "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp"
     database_connect_timeout: int = 3
+    session_expire_days: int = Field(default=7, ge=1, le=90)
 
     # 环境变量优先于 .env；extra=ignore 允许部署环境存在其他无关变量。
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
