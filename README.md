@@ -217,6 +217,9 @@ git push origin main
 
 ```bash
 cd /home/NBN/NBN/agent/magicApp-backend-main && git pull --ff-only origin main
+
+source magicAppEnv/bin/activate
+
 magicAppEnv/bin/pip install -e .
 magicAppEnv/bin/alembic upgrade head
 systemctl restart magicapp-api
