@@ -255,6 +255,28 @@ curl http://127.0.0.1:8001/api/ready
 只有数据库表结构变化时才会有新的迁移需要应用。执行迁移前应先备份数据库；不要删除
 服务器数据库目录或运行 `docker compose down -v`。
 
+
+## 数据库迁移和重启
+```bash
+cd /home/NBN/NBN/agent/magicApp-backend-main
+systemctl stop magicapp-api
+git pull --ff-only origin main
+
+mkdir -p /var/backups/magicapp
+chown postgres:postgres /var/backups/magicapp
+STAMP=$(date +%F_%H%M%S)
+runuser -u postgres -- pg_dump -Fc -d magicapp_db -f "/var/backups/magicapp/magicapp_db_${STAMP}.dump"
+ls -lh /var/backups/magicapp/
+
+magicAppEnv/bin/alembic current    # 应为 0003_user_account_and_name
+magicAppEnv/bin/alembic heads      # 应为 0009_alembic_version_255 (head)
+magicAppEnv/bin/alembic upgrade head
+magicAppEnv/bin/alembic current    # 应为 0009_alembic_version_255 (head)
+
+systemctl start magicapp-api
+curl -s http://127.0.0.1:8001/api/ready
+```
+
 ## 本地查看表
 
 本机 PostgreSQL 启动后，可用 DBeaver 连接 `127.0.0.1:5432`，数据库名为 `magicapp_db`，
