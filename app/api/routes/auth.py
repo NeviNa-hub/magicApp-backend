@@ -27,12 +27,17 @@ def login_user(
     payload: LoginInput,
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
-    """校验账号密码并创建一个有过期时间的登录会话。"""
-    user = db.scalar(select(User).where(User.account == payload.account))
-    if user is None or not verify_password(payload.password, user.password_hash):
-        raise ApiError(code=40101, message="账号或密码错误", status_code=401)
+    """校验账号密码并创建一个有过期时间的登录会话。
 
-    # 停用账号不签发会话，避免客户端拿到无法使用的令牌。
+    账号不存在、密码错误、账号停用分别返回不同业务码，便于前端引导。
+    """
+    user = db.scalar(select(User).where(User.account == payload.account))
+    if user is None:
+        raise ApiError(code=40103, message="账号不存在，请注册", status_code=401)
+    if not verify_password(payload.password, user.password_hash):
+        raise ApiError(code=40101, message="密码错误", status_code=401)
+
+    # 停用账号不签发会话；先校验密码，避免错误密码也能探出停用状态。
     if not user.is_active:
         raise ApiError(code=40301, message="账号已停用", status_code=403)
 
@@ -64,7 +69,7 @@ def login_user(
 @router.post("/register", response_model=ApiResponse)
 def register_user(
     payload: RegisterInput,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
     """创建新账号，并以哈希形式保存密码。"""
     existing_user = db.scalar(select(User).where(User.account == payload.account))

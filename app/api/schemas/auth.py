@@ -5,15 +5,17 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
+Username = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
+]
+
 
 # 注册接口数据格式
 class RegisterInput(BaseModel):
     """注册接口接收的用户名、登录账号和密码。"""
 
-    username: str = Annotated[
-        str,
-        StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
-    ]
+    username: Username
     account: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_]+$")
     password: str = Field(min_length=8, max_length=128)
 
