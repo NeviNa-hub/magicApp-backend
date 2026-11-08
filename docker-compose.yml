@@ -5,7 +5,7 @@ services:
     container_name: magicapp_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: magicapp
+      POSTGRES_DB: magicapp_db
       POSTGRES_USER: magicapp
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
@@ -14,7 +14,7 @@ services:
     volumes:
       - ${POSTGRES_DATA_DIR:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U magicapp -d magicapp"]
+      test: ["CMD-SHELL", "pg_isready -U magicapp -d magicapp_db"]
       interval: 10s
       timeout: 5s
       retries: 5

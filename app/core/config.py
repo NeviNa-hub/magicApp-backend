@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     app_host: str = "127.0.0.1"
     app_port: int = 8001
     app_log_level: str = "INFO"
-    database_url: str = "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp"
+    database_url: str = "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp_db"
     database_connect_timeout: int = 3
     session_expire_days: int = Field(default=7, ge=1, le=90)
 

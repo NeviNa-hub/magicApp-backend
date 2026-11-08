@@ -1,8 +1,8 @@
 # MagicApp 后端
 
 后端使用 Python、FastAPI 和 PostgreSQL。日常在本机修改代码并推送到 GitHub；发布时由
-服务器拉取代码并重启 API。服务器 PostgreSQL 使用独立的 `magicapp` 数据库，不与其他项目
-共用数据库或账号。
+服务器拉取代码并重启 API。服务器 PostgreSQL 使用独立的 `magicapp_db` 数据库，不与其他项目
+共用数据库或账号（数据库账号仍为 `magicapp`）。
 
 ## 目录说明
 
@@ -27,6 +27,9 @@ python -m pip install -e .
 数据库连接，再运行 `docker compose up -d postgres`。数据库文件保存在被 Git 忽略的
 `data/postgres` 目录。
 
+完整的安装、配置、迁移、启动与注册/登录/登出/积分冒烟验证步骤见
+[`docs/runbook.md`](docs/runbook.md)。
+
 ## 发布到服务器
 
 如果 GitHub 后端仓库是私有仓库，先为服务器配置只读 Deploy Key，并在 GitHub 仓库设置中添加
@@ -35,7 +38,7 @@ python -m pip install -e .
 写进命令、脚本或 `.env`。
 
 服务器项目目录为 `/home/NBN/NBN/agent/magicApp-backend-main`。API 在服务器运行，连接
-同一台服务器上的 PostgreSQL；MagicApp 使用独立的 `magicapp` 数据库和账号。
+同一台服务器上的 PostgreSQL；MagicApp 使用独立的 `magicapp_db` 数据库和 `magicapp` 账号。
 
 ### 首次部署
 
@@ -120,7 +123,7 @@ APP_ENV=production
 APP_HOST=127.0.0.1
 APP_PORT=8001
 APP_LOG_LEVEL=INFO
-DATABASE_URL=postgresql+psycopg://magicapp:你的数据库密码@127.0.0.1:5432/magicapp
+DATABASE_URL=postgresql+psycopg://magicapp:你的数据库密码@127.0.0.1:5432/magicapp_db
 DATABASE_CONNECT_TIMEOUT=3
 ```
 
@@ -134,11 +137,11 @@ nano：按 `Ctrl+O`、回车，再按 `Ctrl+X`。
 
 ```bash
 runuser -u postgres -- createuser --login --pwprompt magicapp
-runuser -u postgres -- createdb --owner=magicapp --encoding=UTF8 magicapp
-runuser -u postgres -- psql -d magicapp -c 'GRANT ALL ON SCHEMA public TO magicapp'
+runuser -u postgres -- createdb --owner=magicapp --encoding=UTF8 magicapp_db
+runuser -u postgres -- psql -d magicapp_db -c 'GRANT ALL ON SCHEMA public TO magicapp'
 ```
 
-查看现有数据库，确认 `magicapp` 已创建：
+查看现有数据库，确认 `magicapp_db` 已创建：
 
 ```bash
 runuser -u postgres -- psql -l
@@ -232,8 +235,8 @@ curl http://127.0.0.1:8001/api/ready
 
 ## 本地查看表
 
-本机 PostgreSQL 启动后，可用 DBeaver 连接 `127.0.0.1:5432`，数据库和用户名均为
-`magicapp`。服务器数据库不开放公网端口；需要查看服务器表时，用服务器上的 `psql` 或
+本机 PostgreSQL 启动后，可用 DBeaver 连接 `127.0.0.1:5432`，数据库名为 `magicapp_db`，
+用户名为 `magicapp`。服务器数据库不开放公网端口；需要查看服务器表时，用服务器上的 `psql` 或
 通过 SSH 隧道安全连接。
 
 # 查看接口文档
