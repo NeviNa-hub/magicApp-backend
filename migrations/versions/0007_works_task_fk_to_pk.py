@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import context, op
 
-revision: str = "0007_works_task_fk_to_primary_key"
+revision: str = "0007_works_task_fk_to_pk"
 down_revision: str | None = "0006_constrain_status_fields"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
