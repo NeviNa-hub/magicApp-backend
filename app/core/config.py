@@ -17,9 +17,20 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp_db"
     database_connect_timeout: int = 3
     session_expire_days: int = Field(default=7, ge=1, le=90)
+    # 允许跨域的前端来源，逗号分隔；只填协议+域名+端口，末尾不要带斜杠。
+    cors_allow_origins: str = "http://localhost:5173"
 
     # 环境变量优先于 .env；extra=ignore 允许部署环境存在其他无关变量。
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """把逗号分隔的配置解析成来源列表，忽略空项。"""
+        return [
+            origin.strip()
+            for origin in self.cors_allow_origins.split(",")
+            if origin.strip()
+        ]
 
 
 @lru_cache

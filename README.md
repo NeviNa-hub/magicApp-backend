@@ -130,6 +130,16 @@ DATABASE_CONNECT_TIMEOUT=3
 把数据库密码替换为 MagicApp PostgreSQL 账号的密码，不要使用服务器 root 密码。保存退出
 nano：按 `Ctrl+O`、回车，再按 `Ctrl+X`。
 
+前端与 API 不同源时，在 `.env` 里配置允许来源（逗号分隔，默认只允许 Vite 开发地址）：
+
+```env
+CORS_ALLOW_ORIGINS=http://localhost:5173,https://你的前端正式域名
+```
+
+来源必须与浏览器地址栏**逐字一致**：`http`/`https`、域名、端口都不能差，末尾不能带 `/`；
+`http://localhost:5173` 与 `https://localhost:5173`、`http://127.0.0.1:5173` 都算不同来源。
+前端若通过 Vite `server.proxy` 或与 API 同域部署，则浏览器视角同源，不需要 CORS。
+
 ### 数据库准备
 
 如果 MagicApp 数据库和账号还未创建，以 root 身份执行以下命令。第一条会提示设置数据库

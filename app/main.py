@@ -5,9 +5,11 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes.router import api_router
+from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.core.logging import setup_logging
 from app.core.responses import ApiResponse
@@ -15,6 +17,22 @@ from app.core.responses import ApiResponse
 setup_logging()
 logger = logging.getLogger(__name__)
 app = FastAPI(title="MagicApp API", version="0.1.0")
+# 浏览器跨域联调：来源来自 CORS_ALLOW_ORIGINS，默认只允许 Vite 开发地址。
+_settings = get_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-Request-ID",
+    ],
+)
 # 统一挂载 /api 前缀，具体路径由各功能路由定义。
 app.include_router(api_router, prefix="/api")
 

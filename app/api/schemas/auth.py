@@ -6,7 +6,6 @@ from typing import Annotated
 from pydantic import BaseModel, Field, StringConstraints
 
 
-
 # 注册接口数据格式
 class RegisterInput(BaseModel):
     """注册接口接收的用户名、登录账号和密码。"""
