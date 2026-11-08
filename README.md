@@ -133,7 +133,29 @@ nano：按 `Ctrl+O`、回车，再按 `Ctrl+X`。
 ### 数据库准备
 
 如果 MagicApp 数据库和账号还未创建，以 root 身份执行以下命令。第一条会提示设置数据库
-密码；若数据库或账号已存在，先检查，不要重复创建。不要使用 `weekend_planner` 数据库。
+密码；若数据库或账号已存在，先检查，不要重复创建。
+
+【
+查看已有的数据库列表：runuser -u postgres -- psql -l
+
+查某个数据库里面的表和信息：
+runuser -u postgres -- psql -d magicapp_db        # 用系统账号
+psql -h 127.0.0.1 -U magicapp -d magicapp_db     # 用应用账号，需输密码
+
+进去之后互动式敲这些：
+列出所有表：\dt
+列出所有表和信息：\dt+ | grep magicapp
+看某张表结构：\d users
+查数据直接写 SQL：
+select id, account, username, is_active, created_at from users order by id desc limit 10;
+select count(*) from user_sessions where revoked_at is null;
+select version_num from alembic_version;
+
+不想进交互界面的话，加`-c` 一次一条：
+runuser -u postgres -- psql -d magicapp_db -c "\dt"
+runuser -u postgres -- psql -d magicapp_db -c "select count(*) from users;"
+runuser -u postgres -- psql -d magicapp_db -c "select column_name, data_type, is_nullable, column_default from information_schema.columns where table_name='users' order by ordinal_position;"
+】
 
 ```bash
 runuser -u postgres -- createuser --login --pwprompt magicapp
