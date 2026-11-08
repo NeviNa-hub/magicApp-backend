@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 from app.db.models.base import TimestampMixin
 
+# 新注册用户的初始积分；注册写入、模型默认值和迁移 0008 必须保持一致。
+DEFAULT_POINTS_BALANCE = 100
+
 
 class Account(TimestampMixin, Base):
     """每个用户对应一条余额记录。"""
@@ -23,11 +26,14 @@ class Account(TimestampMixin, Base):
     __tablename__ = "accounts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
-    points_balance: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    points_balance: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, server_default=str(DEFAULT_POINTS_BALANCE)
+    )
 
     __table_args__ = (
         CheckConstraint("points_balance >= 0", name="ck_accounts_nonnegative_balance"),
+        UniqueConstraint("user_id", name="uq_accounts_user_id"),
     )
 
 

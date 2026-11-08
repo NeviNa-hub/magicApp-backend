@@ -8,11 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_session
 from app.api.schemas.auth import LoginInput, LoginResult, RegisterInput, RegisterResult
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.core.responses import ApiResponse, success
 from app.core.security import hash_password, hash_session_token, verify_password
+from app.db.models.account import DEFAULT_POINTS_BALANCE, Account
 from app.db.models.session_model import UserSession
 from app.db.models.user import User
 from app.db.session import get_db
@@ -29,6 +31,10 @@ def login_user(
     user = db.scalar(select(User).where(User.account == payload.account))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise ApiError(code=40101, message="账号或密码错误", status_code=401)
+
+    # 停用账号不签发会话，避免客户端拿到无法使用的令牌。
+    if not user.is_active:
+        raise ApiError(code=40301, message="账号已停用", status_code=403)
 
     # 随机令牌只返回给客户端；数据库仅保存其摘要，避免数据库泄露即可直接冒用令牌。
     access_token = secrets.token_urlsafe(32)
@@ -58,7 +64,7 @@ def login_user(
 @router.post("/register", response_model=ApiResponse)
 def register_user(
     payload: RegisterInput,
-    db: Session = Depends(get_db),  # noqa: B008
+    db: Session = Depends(get_db),
 ) -> ApiResponse:
     """创建新账号，并以哈希形式保存密码。"""
     existing_user = db.scalar(select(User).where(User.account == payload.account))
@@ -72,14 +78,16 @@ def register_user(
     )
     db.add(user)
     try:
-        # commit 才会真正写入数据库；失败时必须 rollback 才能恢复会话。
+        # flush 先分配自增 id，余额行与用户在同一事务内提交：
+        # 任一步失败都会整体回滚，不会留下“有用户但没有余额行”的中间态。
+        db.flush()  # 分配自增 id
+        db.add(Account(user_id=user.id, points_balance=DEFAULT_POINTS_BALANCE))
         db.commit()
     except IntegrityError as error:
         db.rollback()
         raise ApiError(code=40902, message="账号已注册", status_code=409) from error
 
-    # 刷新对象以读取数据库生成的自增 id，再构造不含密码的公开响应。
-    db.refresh(user)
+    # flush 时已回填自增 id；commit 后对象仍在会话中，可直接构造公开响应。
     return success(
         RegisterResult(
             user_id=user.id,
@@ -87,3 +95,19 @@ def register_user(
             account=user.account,
         ).model_dump()
     )
+
+
+# 登出接口
+@router.post("/logout", response_model=ApiResponse)
+def logout_user(
+    user_session: UserSession = Depends(get_current_session),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+) -> ApiResponse:
+    """撤销当前令牌对应的会话。
+
+    令牌无效、已过期或已撤销时统一返回 401（code=40102），
+    因此重复登出与未登录调用行为一致，不会泄露会话是否存在。
+    """
+    user_session.revoked_at = datetime.now(timezone.utc)
+    db.commit()
+    return success(message="已退出登录")
