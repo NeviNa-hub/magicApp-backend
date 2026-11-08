@@ -27,6 +27,7 @@ class RegisterResult(BaseModel):
     username: str
     account: str
 
+
 # 登录接口数据格式
 class LoginInput(BaseModel):
     """登录接口接收的登录账号和密码。"""

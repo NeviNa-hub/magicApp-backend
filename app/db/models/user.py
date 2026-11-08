@@ -27,8 +27,5 @@ class User(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-
     # __table_args__ 定义表级规则   
-    __table_args__ = (
-        UniqueConstraint("account", name="uq_users_account"),  #账号不能重复
-    )
+    __table_args__ = (UniqueConstraint("account", name="uq_users_account"),)

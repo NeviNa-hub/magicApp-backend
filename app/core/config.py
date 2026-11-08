@@ -10,11 +10,10 @@ class Settings(BaseSettings):
     """服务运行配置；密码等私密值只放在不提交的 .env 文件中。"""
 
     app_env: str = "development"
-    # 服务默认只监听本机，由 Nginx 等反向代理对外提供 HTTPS。
-    app_host: str = "127.0.0.1"
-    app_port: int = 8001
     app_log_level: str = "INFO"
-    database_url: str = "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp_db"
+    database_url: str = (
+        "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp_db"
+    )
     database_connect_timeout: int = 3
     session_expire_days: int = Field(default=7, ge=1, le=90)
     # 允许跨域的前端来源，逗号分隔；只填协议+域名+端口，末尾不要带斜杠。
@@ -26,11 +25,7 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         """把逗号分隔的配置解析成来源列表，忽略空项。"""
-        return [
-            origin.strip()
-            for origin in self.cors_allow_origins.split(",")
-            if origin.strip()
-        ]
+        return [origin.strip() for origin in self.cors_allow_origins.split(",") if origin.strip()]
 
 
 @lru_cache

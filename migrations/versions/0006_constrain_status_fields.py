@@ -23,11 +23,8 @@ def _reject_incompatible_rows() -> None:
         return
     bind = op.get_bind()
     for table in _STATUS_TABLES:
-        invalid = bind.execute(
-            sa.text(
-                f"SELECT DISTINCT status FROM {table} WHERE status NOT IN ({_STATUS_IN})"
-            )
-        ).scalars().all()
+        query = sa.text(f"SELECT DISTINCT status FROM {table} WHERE status NOT IN ({_STATUS_IN})")
+        invalid = bind.execute(query).scalars().all()
         if invalid:
             raise RuntimeError(
                 f"{table}.status 存在约束外的历史值 {sorted(invalid)}；"

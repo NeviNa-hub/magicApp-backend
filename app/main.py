@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes.router import api_router
 from app.core.config import get_settings
@@ -66,6 +67,23 @@ async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=body.model_dump())
 
 
+@app.exception_handler(StarletteHTTPException)
+async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """把 404/405 纳入统一响应；其他 HTTP 异常保持原有 detail 结构。"""
+    del request
+    if exc.status_code == 404:
+        body = ApiResponse(code=40401, message="接口不存在", data=None)
+    elif exc.status_code == 405:
+        body = ApiResponse(code=40501, message="请求方法不被允许", data=None)
+    else:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+    return JSONResponse(status_code=exc.status_code, content=body.model_dump())
+
+
 # 全局参数校验异常处理
 @app.exception_handler(RequestValidationError)
 async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -115,8 +133,6 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
         "X-Request-ID", "unknown"
     )
     # 异常处理器内没有活动异常上下文，必须显式传入 exc_info 才会记录堆栈。
-    logger.error(
-        "request_id=%s unhandled_error=%s", request_id, type(exc).__name__, exc_info=exc
-    )
+    logger.error("request_id=%s unhandled_error=%s", request_id, type(exc).__name__, exc_info=exc)
     body = ApiResponse(code=50001, message="服务异常，请稍后重试", data=None)
     return JSONResponse(status_code=500, content=body.model_dump())

@@ -70,9 +70,7 @@ def _describe_migration(
     if not inspect(connection).has_table("alembic_version"):
         return {"reason": "missing_table", "current": None, "expected": expected}
 
-    versions = list(
-        connection.execute(text("SELECT version_num FROM alembic_version")).scalars()
-    )
+    versions = list(connection.execute(text("SELECT version_num FROM alembic_version")).scalars())
     if not versions:
         return {"reason": "unversioned", "current": None, "expected": expected}
     if len(versions) > 1:

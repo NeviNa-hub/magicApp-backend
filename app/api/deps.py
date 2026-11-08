@@ -55,8 +55,8 @@ def get_current_session(
 
 
 def get_current_user(
-    user_session: UserSession = Depends(get_current_session),
-    db: Session = Depends(get_db),
+    user_session: UserSession = Depends(get_current_session),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
 ) -> User:
     """返回当前登录用户；受保护接口直接依赖本函数即可。"""
     user = db.get(User, user_session.user_id)

@@ -11,9 +11,7 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-def _assert_all_references_mapped(
-    source_column: str, target_column: str, label: str
-) -> None:
+def _assert_all_references_mapped(source_column: str, target_column: str, label: str) -> None:
     """确认 source_column 的非空值都已写入 target_column，否则中止迁移。"""
     if context.is_offline_mode():
         return

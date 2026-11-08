@@ -21,6 +21,7 @@ from app.db.session import get_db
 
 router = APIRouter(prefix="/auth", tags=["账号"])
 
+
 # 登录接口
 @router.post("/login", response_model=ApiResponse)
 def login_user(
@@ -43,9 +44,7 @@ def login_user(
 
     # 随机令牌只返回给客户端；数据库仅保存其摘要，避免数据库泄露即可直接冒用令牌。
     access_token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        days=get_settings().session_expire_days
-    )
+    expires_at = datetime.now(timezone.utc) + timedelta(days=get_settings().session_expire_days)
     user_session = UserSession(
         user_id=user.id,
         token_hash=hash_session_token(access_token),
