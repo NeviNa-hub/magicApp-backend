@@ -15,7 +15,17 @@ class Settings(BaseSettings):
         "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp_db"
     )
     database_connect_timeout: int = 3
+    # 模型服务配置可通过环境变量或 .env 覆盖，API Key 不提交到仓库。
     siliconflow_api_key: str = ""
+    siliconflow_base_url: str = "https://api.siliconflow.cn/v1"
+    siliconflow_image_model: str = "Kwai-Kolors/Kolors"
+    siliconflow_image_edit_model: str = "Qwen/Qwen-Image-Edit-2509"
+    siliconflow_video_model: str = "MiniMaxAI/MiniMax-H3"
+    siliconflow_timeout_seconds: int = Field(default=180, ge=1, le=1800)
+    siliconflow_image_size_square: str = "1024x1024"
+    siliconflow_image_size_landscape: str = "1280x720"
+    siliconflow_image_size_portrait: str = "720x1280"
+    siliconflow_image_size_classic: str = "1024x768"
     # 上传文件存放在服务器持久目录，生产环境应配置绝对路径。
     upload_dir: str = "uploads"
     session_expire_days: int = Field(default=7, ge=1, le=90)

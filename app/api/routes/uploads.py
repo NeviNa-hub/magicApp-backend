@@ -32,4 +32,11 @@ def read_image(
 ) -> FileResponse:
     """返回本人图片，避免公开用户上传的原图。"""
     asset, path = get_image(db, user.id, upload_id)
-    return FileResponse(path, media_type=asset.content_type, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+    return FileResponse(
+        path,
+        media_type=asset.content_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

@@ -335,3 +335,7 @@ python -m app.workers.image_generation
 
 `UPLOAD_DIR` 默认为运行目录下的 `uploads`；生产环境请设为持久化绝对路径，并确保 API 进程有读写权限，备份数据库时同时备份图片目录。多实例部署须共享该目录或改用共享存储。图片优化等后续任务应根据当前用户和 `upload_id` 获取图片，不能相信客户端提供的路径。图片保存期限和删除能力尚未实现。
 图片优化复用上述 worker 与 SILICONFLOW_API_KEY，使用 Qwen/Qwen-Image-Edit-2509；提交本人上传的 upload_id 与 prompt，任务失败不自动退款。结果地址约一小时有效。
+
+模型参数集中在 `.env` 或环境变量中，配置项见 `.env.example`：服务地址、文字生图模型、图片编辑模型、预留视频模型、超时时间以及各画幅尺寸。复制示例后自行填写 `SILICONFLOW_API_KEY`；修改后重启 API 和 worker。更换模型时需要自行确认参数和接口兼容性，配置模型名称不会自动实现视频接口。
+
+文字生视频需另外运行 `python -m app.workers.video_generation`；使用 `SILICONFLOW_VIDEO_MODEL` 配置，任务创建扣 5 积分。第三方请求标识保存后进程重启可继续查询；提交请求过程中断且未取得标识时不会自动重发，需人工核查。生成视频链接由服务商提供，可能过期。
