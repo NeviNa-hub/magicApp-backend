@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         "postgresql+psycopg://magicapp:local_dev_password@127.0.0.1:5432/magicapp_db"
     )
     database_connect_timeout: int = 3
+    siliconflow_api_key: str = ""
     session_expire_days: int = Field(default=7, ge=1, le=90)
     # 允许跨域的前端来源，逗号分隔；只填协议+域名+端口，末尾不要带斜杠。
     cors_allow_origins: str = "http://localhost:5173"

@@ -1,7 +1,7 @@
 # MagicApp 后端
 
 基于 FastAPI + PostgreSQL 的账号与积分后端。当前提供注册、登录、登出、当前用户积分查询，
-以及健康/就绪检查；图片上传、生成任务、作品库等功能表结构已预留，但尚没有对应接口。
+任务状态查询以及健康/就绪检查；图片上传、任务创建和作品库接口尚未实现。
 
 - 接口文档（服务启动后）：`/docs`、`/openapi.json`
 - 部署与运维速查：[`docs/runbook.md`](docs/runbook.md)
@@ -14,6 +14,7 @@
 | 登录 | 校验账号密码，签发 Bearer 令牌，数据库只保存令牌摘要 |
 | 登出 | 撤销当前会话，重复登出按未登录处理 |
 | 积分查询 | 查询当前用户余额与扣减流水，支持分页 |
+| 任务查询 | 查询当前用户的生成任务状态 |
 | 健康检查 | `/api/health` 纯进程存活，不查库 |
 | 就绪检查 | `/api/ready` 检查数据库连通性 + Alembic 版本是否与代码一致 |
 
@@ -47,7 +48,7 @@ app/
     ├── session.py       # 引擎、连接池、请求级 Session
     ├── base.py          # SQLAlchemy Base
     └── models/          # 用户、会话、余额、流水、资产、任务、作品
-migrations/versions/     # Alembic 迁移，0001–0009，单 head
+migrations/versions/     # Alembic 迁移，0001–0010，单 head
 docs/                    # runbook、教程、历史评审记录
 ```
 
@@ -114,11 +115,11 @@ runuser -u postgres -- createdb -O magicapp magicapp_db
 ```bash
 alembic upgrade head        # 首次/升级：应用全部未执行迁移
 alembic current             # 当前库版本
-alembic heads               # 代码中的 head，当前为 0009_alembic_version_255
+alembic heads               # 代码中的 head，当前为 0010_task_progress
 alembic downgrade -1        # 回退一步；指定版本用 alembic downgrade <revision>
 ```
 
-- 首次部署从 `0001` 依次升到 `0009`；之后每次发布只跑 `upgrade head`。
+- 首次部署从 `0001` 依次升到 `0010`；之后每次发布只跑 `upgrade head`。
 - 迁移前先备份，迁移时先停服务；具体命令见 [runbook](docs/runbook.md)。
 - 只改模型不建迁移会导致真实库缺列，接口报 500；已应用的迁移不要回头修改，新增变更请新建迁移。
 - 新增迁移的 revision id 必须 ≤ 32 字符（0009 已把版本表字段扩到 255，但仍建议保持简短）。
@@ -185,6 +186,7 @@ API 也必须是 https。跨域仍需 `CORS_ALLOW_ORIGINS`，HTTPS 不能替代 
 | POST | `/api/auth/login` | 否 | 登录，body：`account`、`password` |
 | POST | `/api/auth/logout` | 是 | 登出，无 body |
 | GET | `/api/points/myInfo` | 是 | 积分查询，query：`page`、`page_size` |
+| GET | `/api/tasks/{task_id}` | 是 | 查询本人任务状态，返回 `task_id`、`task_type`、`status`、`progress`、`result_urls`、`error_message` |
 | GET | `/api/health` | 否 | 进程存活 |
 | GET | `/api/ready` | 否 | 数据库与迁移版本就绪 |
 
@@ -214,6 +216,7 @@ Authorization: Bearer <access_token>
 | 401 | `40103` | 账号不存在，请注册 |
 | 403 | `40301` | 账号已停用 |
 | 404 | `40401` | 接口不存在（路径未匹配） |
+| 404 | `40402` | 任务不存在或不属于当前用户 |
 | 405 | `40501` | 请求方法不被允许 |
 | 409 | `40902` | 账号已注册 |
 | 422 | `42201` | 请求参数不合法 |
@@ -291,9 +294,9 @@ runuser -u postgres -- pg_dump -Fc -d magicapp_db -f "/var/backups/magicapp/magi
 ls -lh /var/backups/magicapp/
 
 magicAppEnv/bin/alembic current    # 应为 0003_user_account_and_name
-magicAppEnv/bin/alembic heads      # 应为 0009_alembic_version_255 (head)
+magicAppEnv/bin/alembic heads      # 应为 0010_task_progress (head)
 magicAppEnv/bin/alembic upgrade head
-magicAppEnv/bin/alembic current    # 应为 0009_alembic_version_255 (head)
+magicAppEnv/bin/alembic current    # 应为 0010_task_progress (head)
 
 systemctl start magicapp-api
 curl -s http://127.0.0.1:8001/api/ready
@@ -310,3 +313,12 @@ curl -s http://127.0.0.1:8001/api/ready
 curl http://127.0.0.1:8001/docs
 ## 或者通过 SSH 隧道把服务器端口安全转到本机，再用本机浏览器打开 Swagger 页面： 
 ssh -L 8001:127.0.0.1:8001 root@li-AI
+## 文字生图后台进程
+
+设置 `SILICONFLOW_API_KEY`，执行 `alembic upgrade head` 后，以与 API 相同的环境启动独立进程：
+
+```bash
+python -m app.workers.image_generation
+```
+
+需要进程管理器保持 worker 运行。生成地址约一小时失效，不保存图片文件。worker 在调用第三方期间异常退出时，任务可能停留在 processing；不要盲目重试，以免重复调用及计费，需人工核查后处理。生成失败不会自动退积分。前端真实模式需要设置 `VITE_USE_MOCK=false`。

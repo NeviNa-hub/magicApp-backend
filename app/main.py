@@ -32,6 +32,7 @@ app.add_middleware(
         "Origin",
         "X-Requested-With",
         "X-Request-ID",
+        "Idempotency-Key",
     ],
 )
 # 统一挂载 /api 前缀，具体路径由各功能路由定义。
@@ -130,7 +131,8 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
     """服务端记录异常详情，客户端只收到通用错误信息。"""
     # 详细异常只写入服务端日志，响应不给调用方暴露堆栈或数据库信息。
     request_id = getattr(request.state, "request_id", None) or request.headers.get(
-        "X-Request-ID", "unknown"
+        "X-Request-ID",
+        "Idempotency-Key", "unknown"
     )
     # 异常处理器内没有活动异常上下文，必须显式传入 exc_info 才会记录堆栈。
     logger.error("request_id=%s unhandled_error=%s", request_id, type(exc).__name__, exc_info=exc)
