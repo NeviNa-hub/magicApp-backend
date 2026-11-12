@@ -1,36 +1,36 @@
 # MagicApp 后端
 
 基于 FastAPI + PostgreSQL 的账号与积分后端。当前提供注册、登录、登出、当前用户积分查询，
-任务状态查询以及健康/就绪检查；图片上传、任务创建和作品库接口尚未实现。
+任务状态查询、文字生图、作品库以及健康/就绪检查；图片上传等功能尚未实现。
 
 - 接口文档（服务启动后）：`/docs`、`/openapi.json`
 - 部署与运维速查：[`docs/runbook.md`](docs/runbook.md)
 
 ## 1. 能力边界
 
-| 已实现 | 说明 |
-| --- | --- |
-| 注册 | 创建用户并同时创建积分余额行，新用户默认 100 积分 |
-| 登录 | 校验账号密码，签发 Bearer 令牌，数据库只保存令牌摘要 |
-| 登出 | 撤销当前会话，重复登出按未登录处理 |
-| 积分查询 | 查询当前用户余额与扣减流水，支持分页 |
-| 任务查询 | 查询当前用户的生成任务状态 |
-| 健康检查 | `/api/health` 纯进程存活，不查库 |
+| 已实现   | 说明                                                       |
+| -------- | ---------------------------------------------------------- |
+| 注册     | 创建用户并同时创建积分余额行，新用户默认 100 积分          |
+| 登录     | 校验账号密码，签发 Bearer 令牌，数据库只保存令牌摘要       |
+| 登出     | 撤销当前会话，重复登出按未登录处理                         |
+| 积分查询 | 查询当前用户余额与扣减流水，支持分页                       |
+| 任务查询 | 查询当前用户的生成任务状态                                 |
+| 作品库   | 查询本人进行中任务和已完成作品，支持筛选及分页             |
+| 健康检查 | `/api/health` 纯进程存活，不查库                           |
 | 就绪检查 | `/api/ready` 检查数据库连通性 + Alembic 版本是否与代码一致 |
-
 
 ## 2. 技术栈与版本
 
-| 组件 | 版本要求 |
-| --- | --- |
-| Python | >= 3.10 |
-| FastAPI | >= 0.115, < 1.0 |
-| SQLAlchemy | >= 2.0, < 3.0 |
-| Alembic | >= 1.14, < 2.0 |
-| PostgreSQL 驱动 | `psycopg[binary]` >= 3.2 |
-| 密码哈希 | `pwdlib[argon2]` |
-| 配置 | `pydantic-settings` >= 2.7 |
-| ASGI 服务器 | `uvicorn[standard]` >= 0.34 |
+| 组件            | 版本要求                    |
+| --------------- | --------------------------- |
+| Python          | >= 3.10                     |
+| FastAPI         | >= 0.115, < 1.0             |
+| SQLAlchemy      | >= 2.0, < 3.0               |
+| Alembic         | >= 1.14, < 2.0              |
+| PostgreSQL 驱动 | `psycopg[binary]` >= 3.2    |
+| 密码哈希        | `pwdlib[argon2]`            |
+| 配置            | `pydantic-settings` >= 2.7  |
+| ASGI 服务器     | `uvicorn[standard]` >= 0.34 |
 
 依赖以 [`pyproject.toml`](pyproject.toml) 为准。
 
@@ -77,15 +77,15 @@ magicAppEnv/bin/pip install -e .
 
 ## 5. 配置项（`.env`）ss
 
-| 配置项 | 必填 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `DATABASE_URL` | 是 | 本机示例值 | PostgreSQL 连接串，库名用 `magicapp_db`，账号 `magicapp` |
-| `APP_ENV` | 否 | `development` | 环境标识，当前仅用于标记 |
-| `APP_LOG_LEVEL` | 否 | `INFO` | 日志级别 |
-| `DATABASE_CONNECT_TIMEOUT` | 否 | `3` | 数据库连接/取连接超时秒数 |
-| `SESSION_EXPIRE_DAYS` | 否 | `7` | 登录令牌有效期，允许 1–90 天 |
-| `CORS_ALLOW_ORIGINS` | 否 | `http://localhost:5173` | 允许跨域的前端来源，逗号分隔 |
-| `POSTGRES_PASSWORD` | 否 | 无 | 仅 `docker-compose.yml` 本地起库使用，应用不读取 |
+| 配置项                     | 必填 | 默认值                  | 说明                                                     |
+| -------------------------- | ---- | ----------------------- | -------------------------------------------------------- |
+| `DATABASE_URL`             | 是   | 本机示例值              | PostgreSQL 连接串，库名用 `magicapp_db`，账号 `magicapp` |
+| `APP_ENV`                  | 否   | `development`           | 环境标识，当前仅用于标记                                 |
+| `APP_LOG_LEVEL`            | 否   | `INFO`                  | 日志级别                                                 |
+| `DATABASE_CONNECT_TIMEOUT` | 否   | `3`                     | 数据库连接/取连接超时秒数                                |
+| `SESSION_EXPIRE_DAYS`      | 否   | `7`                     | 登录令牌有效期，允许 1–90 天                             |
+| `CORS_ALLOW_ORIGINS`       | 否   | `http://localhost:5173` | 允许跨域的前端来源，逗号分隔                             |
+| `POSTGRES_PASSWORD`        | 否   | 无                      | 仅 `docker-compose.yml` 本地起库使用，应用不读取         |
 
 服务器 `.env` 示例：
 
@@ -180,15 +180,16 @@ API 也必须是 https。跨域仍需 `CORS_ALLOW_ORIGINS`，HTTPS 不能替代 
 
 ## 9. 接口清单与鉴权
 
-| 方法 | 路径 | 鉴权 | 说明 |
-| --- | --- | --- | --- |
-| POST | `/api/auth/register` | 否 | 注册，body：`username`、`account`、`password` |
-| POST | `/api/auth/login` | 否 | 登录，body：`account`、`password` |
-| POST | `/api/auth/logout` | 是 | 登出，无 body |
-| GET | `/api/points/myInfo` | 是 | 积分查询，query：`page`、`page_size` |
-| GET | `/api/tasks/{task_id}` | 是 | 查询本人任务状态，返回 `task_id`、`task_type`、`status`、`progress`、`result_urls`、`error_message` |
-| GET | `/api/health` | 否 | 进程存活 |
-| GET | `/api/ready` | 否 | 数据库与迁移版本就绪 |
+| 方法 | 路径                   | 鉴权 | 说明                                                                                                |
+| ---- | ---------------------- | ---- | --------------------------------------------------------------------------------------------------- |
+| POST | `/api/auth/register`   | 否   | 注册，body：`username`、`account`、`password`                                                       |
+| POST | `/api/auth/login`      | 否   | 登录，body：`account`、`password`                                                                   |
+| POST | `/api/auth/logout`     | 是   | 登出，无 body                                                                                       |
+| GET  | `/api/points/myInfo`   | 是   | 积分查询，query：`page`、`page_size`                                                                |
+| GET  | `/api/tasks/{task_id}` | 是   | 查询本人任务状态，返回 `task_id`、`task_type`、`status`、`progress`、`result_urls`、`error_message` |
+| GET  | `/api/library`         | 是   | 本人作品库，query：`status`、`page`、`page_size`                                                    |
+| GET  | `/api/health`          | 否   | 进程存活                                                                                            |
+| GET  | `/api/ready`           | 否   | 数据库与迁移版本就绪                                                                                |
 
 受保护接口请求头：
 
@@ -203,37 +204,37 @@ Authorization: Bearer <access_token>
 统一响应格式：
 
 ```json
-{"code": 200, "message": "操作成功", "data": {}}
+{ "code": 200, "message": "操作成功", "data": {} }
 ```
 
 ## 10. 错误码
 
-| HTTP | `code` | 含义 |
-| --- | --- | --- |
-| 200 | `200` | 成功 |
-| 401 | `40101` | 密码错误 |
-| 401 | `40102` | 未登录：令牌缺失、格式错误、无效、过期或已登出 |
-| 401 | `40103` | 账号不存在，请注册 |
-| 403 | `40301` | 账号已停用 |
-| 404 | `40401` | 接口不存在（路径未匹配） |
-| 404 | `40402` | 任务不存在或不属于当前用户 |
-| 405 | `40501` | 请求方法不被允许 |
-| 409 | `40902` | 账号已注册 |
-| 422 | `42201` | 请求参数不合法 |
-| 500 | `50001` | 服务端或数据库异常 |
-| 503 | `50001` | `/api/ready` 数据库不可用或迁移版本不一致 |
+| HTTP | `code`  | 含义                                           |
+| ---- | ------- | ---------------------------------------------- |
+| 200  | `200`   | 成功                                           |
+| 401  | `40101` | 密码错误                                       |
+| 401  | `40102` | 未登录：令牌缺失、格式错误、无效、过期或已登出 |
+| 401  | `40103` | 账号不存在，请注册                             |
+| 403  | `40301` | 账号已停用                                     |
+| 404  | `40401` | 接口不存在（路径未匹配）                       |
+| 404  | `40402` | 任务不存在或不属于当前用户                     |
+| 405  | `40501` | 请求方法不被允许                               |
+| 409  | `40902` | 账号已注册                                     |
+| 422  | `42201` | 请求参数不合法                                 |
+| 500  | `50001` | 服务端或数据库异常                             |
+| 503  | `50001` | `/api/ready` 数据库不可用或迁移版本不一致      |
 
 ## 11. 常见故障排查
 
-| 现象 | 常见原因 | 处理 |
-| --- | --- | --- |
-| 接口 500，日志 `column ... does not exist` | 模型有新增列，库没跑迁移 | `alembic current` / `alembic heads`，执行 `alembic upgrade head` |
-| `/api/ready` 503，`reason=behind/missing_table` | 迁移落后或没建版本表 | 停服后 `alembic upgrade head`，再启动 |
-| `/api/ready` 503，`reason=database_unavailable` | 库未启动、连接串/密码/库名错误 | 查 `DATABASE_URL`、`pg_isready`、数据库日志 |
-| 502 Bad Gateway | uvicorn 没启动或端口不一致 | `systemctl status magicapp-api`、`ss -ltnp \| grep 8001` |
-| 404，路径变成 `/auth/login` | 反向代理吃掉了 `/api` | `proxy_pass` 不要带路径后缀，保留原始 URI |
-| 浏览器跨域报错 | 来源不在白名单或写法不完全一致 | 配置 `CORS_ALLOW_ORIGINS` 并重启；注意协议/端口/末尾斜杠 |
-| 401 `40102` | 未带令牌、令牌过期或已登出 | 重新登录并替换本地令牌 |
+| 现象                                            | 常见原因                       | 处理                                                             |
+| ----------------------------------------------- | ------------------------------ | ---------------------------------------------------------------- |
+| 接口 500，日志 `column ... does not exist`      | 模型有新增列，库没跑迁移       | `alembic current` / `alembic heads`，执行 `alembic upgrade head` |
+| `/api/ready` 503，`reason=behind/missing_table` | 迁移落后或没建版本表           | 停服后 `alembic upgrade head`，再启动                            |
+| `/api/ready` 503，`reason=database_unavailable` | 库未启动、连接串/密码/库名错误 | 查 `DATABASE_URL`、`pg_isready`、数据库日志                      |
+| 502 Bad Gateway                                 | uvicorn 没启动或端口不一致     | `systemctl status magicapp-api`、`ss -ltnp \| grep 8001`         |
+| 404，路径变成 `/auth/login`                     | 反向代理吃掉了 `/api`          | `proxy_pass` 不要带路径后缀，保留原始 URI                        |
+| 浏览器跨域报错                                  | 来源不在白名单或写法不完全一致 | 配置 `CORS_ALLOW_ORIGINS` 并重启；注意协议/端口/末尾斜杠         |
+| 401 `40102`                                     | 未带令牌、令牌过期或已登出     | 重新登录并替换本地令牌                                           |
 
 更完整的迁移、备份、回退步骤见 [docs/runbook.md](docs/runbook.md)。
 
@@ -250,8 +251,6 @@ Authorization: Bearer <access_token>
 - 部署、备份、迁移验证、回退：[docs/runbook.md](docs/runbook.md)
 - 代码逐层讲解：[docs/backend_tutorial.md](docs/backend_tutorial.md)
 - 2026-11-07 历史评审记录：[docs/code_review_2026-11-07.md](docs/code_review_2026-11-07.md)（历史文档，结论以当前代码为准）
-
-
 
 # 后续更新的操作流程
 
@@ -280,8 +279,8 @@ curl http://127.0.0.1:8001/api/ready
 只有数据库表结构变化时才会有新的迁移需要应用。执行迁移前应先备份数据库；不要删除
 服务器数据库目录或运行 `docker compose down -v`。
 
-
 ## 数据库迁移和重启
+
 ```bash
 cd /home/NBN/NBN/agent/magicApp-backend-main
 systemctl stop magicapp-api
@@ -309,10 +308,15 @@ curl -s http://127.0.0.1:8001/api/ready
 通过 SSH 隧道安全连接。
 
 # 查看接口文档
+
 ## 用 Swagger 页面查看接口并发请求：
+
 curl http://127.0.0.1:8001/docs
-## 或者通过 SSH 隧道把服务器端口安全转到本机，再用本机浏览器打开 Swagger 页面： 
+
+## 或者通过 SSH 隧道把服务器端口安全转到本机，再用本机浏览器打开 Swagger 页面：
+
 ssh -L 8001:127.0.0.1:8001 root@li-AI
+
 ## 文字生图后台进程
 
 设置 `SILICONFLOW_API_KEY`，执行 `alembic upgrade head` 后，以与 API 相同的环境启动独立进程：
@@ -322,3 +326,5 @@ python -m app.workers.image_generation
 ```
 
 需要进程管理器保持 worker 运行。生成地址约一小时失效，不保存图片文件。worker 在调用第三方期间异常退出时，任务可能停留在 processing；不要盲目重试，以免重复调用及计费，需人工核查后处理。生成失败不会自动退积分。前端真实模式需要设置 `VITE_USE_MOCK=false`。
+
+作品库筛选状态为 all、completed、creating、draft；draft 暂无数据。分页默认 1 / 10，page_size 最大 100。创作中记录的 work_id 为任务数据库主键的负数，仅作为列表标识；task_id 可用于查询任务。生成结果链接可能过期。
