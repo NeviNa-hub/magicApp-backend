@@ -69,7 +69,9 @@ async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
 
 
 @app.exception_handler(StarletteHTTPException)
-async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+async def handle_http_exception(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
     """把 404/405 纳入统一响应；其他 HTTP 异常保持原有 detail 结构。"""
     del request
     if exc.status_code == 404:
@@ -87,7 +89,9 @@ async def handle_http_exception(request: Request, exc: StarletteHTTPException) -
 
 # 全局参数校验异常处理
 @app.exception_handler(RequestValidationError)
-async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def handle_validation_error(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     """把常见字段校验错误转换成中文提示，不回显用户提交的内容。"""
     del request
     messages = []
@@ -131,10 +135,11 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
     """服务端记录异常详情，客户端只收到通用错误信息。"""
     # 详细异常只写入服务端日志，响应不给调用方暴露堆栈或数据库信息。
     request_id = getattr(request.state, "request_id", None) or request.headers.get(
-        "X-Request-ID",
-        "Idempotency-Key", "unknown"
+        "X-Request-ID", "unknown"
     )
     # 异常处理器内没有活动异常上下文，必须显式传入 exc_info 才会记录堆栈。
-    logger.error("request_id=%s unhandled_error=%s", request_id, type(exc).__name__, exc_info=exc)
+    logger.error(
+        "request_id=%s unhandled_error=%s", request_id, type(exc).__name__, exc_info=exc
+    )
     body = ApiResponse(code=50001, message="服务异常，请稍后重试", data=None)
     return JSONResponse(status_code=500, content=body.model_dump())

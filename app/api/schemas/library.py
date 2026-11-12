@@ -16,9 +16,9 @@ class LibraryTab(BaseModel):
 class LibraryPageInfo(BaseModel):
     """当前筛选条件下的分页信息。"""
 
-    page: int
-    page_size: int
-    total: int
+    page: int = Field(description="当前页码，从 1 开始")
+    page_size: int = Field(description="每页条数")
+    total: int = Field(description="当前筛选状态的总条数")
 
 
 class LibraryItem(BaseModel):

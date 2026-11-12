@@ -1,7 +1,7 @@
 # MagicApp 后端
 
 基于 FastAPI + PostgreSQL 的账号与积分后端。当前提供注册、登录、登出、当前用户积分查询，
-任务状态查询、文字生图、作品库以及健康/就绪检查；图片上传等功能尚未实现。
+任务状态查询、文字生图、作品库、图片上传以及健康/就绪检查。
 
 - 接口文档（服务启动后）：`/docs`、`/openapi.json`
 - 部署与运维速查：[`docs/runbook.md`](docs/runbook.md)
@@ -328,3 +328,10 @@ python -m app.workers.image_generation
 需要进程管理器保持 worker 运行。生成地址约一小时失效，不保存图片文件。worker 在调用第三方期间异常退出时，任务可能停留在 processing；不要盲目重试，以免重复调用及计费，需人工核查后处理。生成失败不会自动退积分。前端真实模式需要设置 `VITE_USE_MOCK=false`。
 
 作品库筛选状态为 all、completed、creating、draft；draft 暂无数据。分页默认 1 / 10，page_size 最大 100。创作中记录的 work_id 为任务数据库主键的负数，仅作为列表标识；task_id 可用于查询任务。生成结果链接可能过期。
+
+## 图片上传与存储
+
+上传 JPEG、PNG 或 WebP，文件大小不超过 5 MiB、像素不超过 2500 万。请求为 `multipart/form-data`，字段名 `file`，响应 `data` 包含 `upload_id`、`url`、`name`。`url` 是站内相对路径，需要带 Bearer 令牌读取，不能直接交给未携带令牌的浏览器图片标签或第三方服务。
+
+`UPLOAD_DIR` 默认为运行目录下的 `uploads`；生产环境请设为持久化绝对路径，并确保 API 进程有读写权限，备份数据库时同时备份图片目录。多实例部署须共享该目录或改用共享存储。图片优化等后续任务应根据当前用户和 `upload_id` 获取图片，不能相信客户端提供的路径。图片保存期限和删除能力尚未实现。
+图片优化复用上述 worker 与 SILICONFLOW_API_KEY，使用 Qwen/Qwen-Image-Edit-2509；提交本人上传的 upload_id 与 prompt，任务失败不自动退款。结果地址约一小时有效。
