@@ -97,6 +97,11 @@ systemctl start magicapp-api
 sudo systemctl restart magicapp-api
 ```
 
+启动图片生成 worker：
+```bash
+python -m app.workers.image_generation
+```
+
 每次更新后检查服务和数据库就绪状态：
 
 ```bash
