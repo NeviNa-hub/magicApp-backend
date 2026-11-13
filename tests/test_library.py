@@ -61,6 +61,27 @@ class LibraryTest(unittest.TestCase):
         del app.dependency_overrides[get_current_user]
         self.assertEqual(self.client.get("/api/library").status_code, 401)
 
+    def test_delete_own_work(self):
+        response = self.client.delete("/api/library/works/1")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"], {"work_id": 1})
+        with Session(self.engine) as db:
+            self.assertIsNone(db.get(Work, 1))
+        completed = self.client.get("/api/library?status=completed").json()["data"]
+        self.assertEqual(completed["lists"], [])
+        self.assertEqual(completed["page_info"]["total"], 0)
+
+    def test_delete_other_user_work_returns_not_found(self):
+        response = self.client.delete("/api/library/works/2")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["code"], 40404)
+        with Session(self.engine) as db:
+            self.assertIsNotNone(db.get(Work, 2))
+
+    def test_delete_work_requires_authentication(self):
+        del app.dependency_overrides[get_current_user]
+        self.assertEqual(self.client.delete("/api/library/works/1").status_code, 401)
+
 
 if __name__ == "__main__":
     unittest.main()

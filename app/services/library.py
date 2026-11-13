@@ -9,6 +9,7 @@ from app.api.schemas.library import (
     LibraryResult,
     LibraryTab,
 )
+from app.core.errors import ApiError
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 
@@ -158,3 +159,13 @@ def _get_page_items(
                 )
             )
     return items
+
+
+def delete_work(db: Session, user_id: int, work_id: int) -> None:
+    """删除本人作品；不存在或不属于本人时统一按不存在处理，避免暴露他人数据。"""
+    work = db.scalar(select(Work).where(Work.id == work_id, Work.user_id == user_id))
+    if work is None:
+        raise ApiError(code=40404, message="作品不存在", status_code=404)
+    # 只删除作品记录，来源任务与积分流水保留，便于追溯创作历史。
+    db.delete(work)
+    db.commit()
