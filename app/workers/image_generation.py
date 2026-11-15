@@ -10,6 +10,7 @@ from app.db.models.work import Work
 from app.db.session import SessionLocal
 from app.services.siliconflow import generate_image
 from app.services.siliconflow_image_edit import optimize_image
+from app.services.tasks import fail_task
 from app.services.uploads import get_image
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,13 @@ def run_one() -> bool:
             url = optimize_image(image_bytes, content_type, data["prompt"])
         else:
             url = generate_image(data)
+    # 模型未产出结果时第三方不计费，退回本次扣费；不自动重试避免重复生成。
+    except Exception:
+        logger.exception("图片任务处理失败 task_id=%s", task_id)
+        with SessionLocal() as db:
+            fail_task(db, user_id, task_id, "图片生成失败，请稍后重试", refund=True)
+        return True
+    try:
         with SessionLocal() as db:
             task = db.get(GenerationTask, task_id, with_for_update=True)
             if task is None or task.status != "processing":
@@ -64,15 +72,11 @@ def run_one() -> bool:
             task.progress = 100
             task.status = "completed"
             db.commit()
-    # 不自动重试第三方调用，避免结果不明确时重复生成及计费。
+    # 模型已产出图片且第三方已计费，保留扣费，重试时不再额外扣费。
     except Exception:
-        logger.exception("图片任务处理失败 task_id=%s", task_id)
+        logger.exception("图片任务归档失败 task_id=%s", task_id)
         with SessionLocal() as db:
-            task = db.get(GenerationTask, task_id, with_for_update=True)
-            if task and task.status == "processing":
-                task.status = "failed"
-                task.error_message = "图片生成失败，请稍后重试"
-                db.commit()
+            fail_task(db, user_id, task_id, "生成结果归档失败，请稍后重试", refund=False)
     return True
 
 

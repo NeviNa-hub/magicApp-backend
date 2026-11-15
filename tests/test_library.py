@@ -24,11 +24,57 @@ class LibraryTest(unittest.TestCase):
         Work.__table__.create(self.engine)
         with Session(self.engine) as db:
             db.add_all([
-                GenerationTask(id=1, task_id="one", user_id=1, task_type="image", status="processing", input_data={"prompt": "本人任务"}, cost_points=2),
-                GenerationTask(id=2, task_id="other", user_id=2, task_type="image", status="pending", input_data={"prompt": "他人任务"}, cost_points=2),
-                GenerationTask(id=3, task_id="failed", user_id=1, task_type="image", status="failed", input_data={}, cost_points=2),
-                Work(id=1, user_id=1, title="本人作品", status="completed", media_type="image", media_url="https://example.com/a"),
-                Work(id=2, user_id=2, title="他人作品", status="completed", media_type="image"),
+                GenerationTask(
+                    id=1,
+                    task_id="one",
+                    user_id=1,
+                    task_type="image",
+                    status="processing",
+                    input_data={"prompt": "本人任务"},
+                    cost_points=2,
+                ),
+                GenerationTask(
+                    id=2,
+                    task_id="other",
+                    user_id=2,
+                    task_type="image",
+                    status="pending",
+                    input_data={"prompt": "他人任务"},
+                    cost_points=2,
+                ),
+                GenerationTask(
+                    id=3,
+                    task_id="failed",
+                    user_id=1,
+                    task_type="image",
+                    status="failed",
+                    input_data={},
+                    cost_points=2,
+                ),
+                GenerationTask(
+                    id=4,
+                    task_id="draft",
+                    user_id=1,
+                    task_type="image",
+                    status="canceled",
+                    input_data={"prompt": "已取消的草稿"},
+                    cost_points=2,
+                ),
+                Work(
+                    id=1,
+                    user_id=1,
+                    title="本人作品",
+                    status="completed",
+                    media_type="image",
+                    media_url="https://example.com/a",
+                ),
+                Work(
+                    id=2,
+                    user_id=2,
+                    title="他人作品",
+                    status="completed",
+                    media_type="image",
+                ),
             ])
             db.commit()
         def get_test_db():
@@ -45,15 +91,24 @@ class LibraryTest(unittest.TestCase):
 
     def test_filter_pagination_and_isolation(self):
         data = self.client.get("/api/library?page_size=1").json()["data"]
-        self.assertEqual(data["page_info"]["total"], 2)
-        self.assertEqual([tab["count"] for tab in data["tabs"]], [2, 1, 1, 0])
+        self.assertEqual(data["page_info"]["total"], 3)
+        self.assertEqual([tab["count"] for tab in data["tabs"]], [3, 1, 1, 1])
         second = self.client.get("/api/library?page_size=1&page=2").json()["data"]
         self.assertNotEqual(data["lists"][0]["work_id"], second["lists"][0]["work_id"])
         creating = self.client.get("/api/library?status=creating").json()["data"]
         self.assertEqual(creating["lists"][0]["task_id"], "one")
         self.assertEqual(creating["lists"][0]["work_id"], -1)
-        self.assertEqual(self.client.get("/api/library?status=draft").json()["data"]["lists"], [])
-        self.assertEqual(self.client.get("/api/library?status=completed").json()["data"]["lists"][0]["title"], "本人作品")
+        self.assertEqual(creating["lists"][0]["status"], "creating")
+        # 取消的任务进入草稿，仍可在作品库中查看。
+        draft = self.client.get("/api/library?status=draft").json()["data"]
+        self.assertEqual(len(draft["lists"]), 1)
+        self.assertEqual(draft["lists"][0]["task_id"], "draft")
+        self.assertEqual(draft["lists"][0]["title"], "已取消的草稿")
+        self.assertEqual(draft["lists"][0]["status"], "draft")
+        self.assertEqual(
+            self.client.get("/api/library?status=completed").json()["data"]["lists"][0]["title"],
+            "本人作品",
+        )
         self.assertEqual(self.client.get("/api/library?page=0").status_code, 422)
         self.assertEqual(self.client.get("/api/library?status=unknown").status_code, 422)
 
@@ -74,7 +129,7 @@ class LibraryTest(unittest.TestCase):
     def test_delete_other_user_work_returns_not_found(self):
         response = self.client.delete("/api/library/works/2")
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["code"], 40404)
+        self.assertEqual(response.json()["code"], 404)
         with Session(self.engine) as db:
             self.assertIsNotNone(db.get(Work, 2))
 

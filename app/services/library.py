@@ -15,12 +15,14 @@ from app.db.models.work import Work
 
 TYPE_NAMES = {"image": "文字生图", "optimization": "图片优化", "video": "视频创作"}
 CREATING_STATUSES = ("pending", "processing")
+# 用户取消的任务保留在草稿中，避免记录直接从作品库消失。
+DRAFT_STATUSES = ("canceled",)
 
 
 def get_library(
     db: Session, user_id: int, status: str, page: int, page_size: int
 ) -> LibraryResult:
-    """查询本人创作中任务与已完成作品，返回各状态数量和当前页。"""
+    """查询本人创作中任务、草稿与已完成作品，返回各状态数量和当前页。"""
     completed_count = (
         db.scalar(
             select(func.count())
@@ -40,12 +42,27 @@ def get_library(
         )
         or 0
     )
+    draft_count = (
+        db.scalar(
+            select(func.count())
+            .select_from(GenerationTask)
+            .where(
+                GenerationTask.user_id == user_id,
+                GenerationTask.status.in_(DRAFT_STATUSES),
+            )
+        )
+        or 0
+    )
     tabs = [
-        LibraryTab(status="all", name="全部", count=completed_count + creating_count),
+        LibraryTab(
+            status="all",
+            name="全部",
+            count=completed_count + creating_count + draft_count,
+        ),
         LibraryTab(status="completed", name="已完成", count=completed_count),
         LibraryTab(status="creating", name="创作中", count=creating_count),
-        # 当前没有服务端草稿模型，不将等待中的任务当作草稿。
-        LibraryTab(status="draft", name="草稿", count=0),
+        # 已取消的任务作为草稿保留，用户可在作品库继续查看。
+        LibraryTab(status="draft", name="草稿", count=draft_count),
     ]
     total = {tab.status: tab.count for tab in tabs}[status]
     items = _get_page_items(db, user_id, status, page, page_size) if total else []
@@ -65,19 +82,30 @@ def _get_page_items(
         Work.created_at.label("created_at"),
         literal("work").label("kind"),
     ).where(Work.user_id == user_id, Work.status == "completed")
-    tasks = select(
+    creating_tasks = select(
         GenerationTask.id.label("id"),
         GenerationTask.created_at.label("created_at"),
         literal("task").label("kind"),
     ).where(
-        GenerationTask.user_id == user_id, GenerationTask.status.in_(CREATING_STATUSES)
+        GenerationTask.user_id == user_id,
+        GenerationTask.status.in_(CREATING_STATUSES),
+    )
+    draft_tasks = select(
+        GenerationTask.id.label("id"),
+        GenerationTask.created_at.label("created_at"),
+        literal("task").label("kind"),
+    ).where(
+        GenerationTask.user_id == user_id,
+        GenerationTask.status.in_(DRAFT_STATUSES),
     )
     if status == "all":
-        query = union_all(works, tasks).subquery()
+        query = union_all(works, creating_tasks, draft_tasks).subquery()
     elif status == "completed":
         query = works.subquery()
+    elif status == "draft":
+        query = draft_tasks.subquery()
     else:
-        query = tasks.subquery()
+        query = creating_tasks.subquery()
 
     # 相同创建时间时再按类型和主键排序，避免分页顺序不稳定。
     rows = db.execute(
@@ -108,13 +136,20 @@ def _get_page_items(
         else []
     )
     works_by_id = {work.id: (work, task) for work, task in work_rows}
+    # 全部列表同时回查创作中与草稿，避免两次查询之间状态变化导致漏展示。
+    if status == "draft":
+        task_statuses = DRAFT_STATUSES
+    elif status == "creating":
+        task_statuses = CREATING_STATUSES
+    else:
+        task_statuses = CREATING_STATUSES + DRAFT_STATUSES
     tasks_by_id = (
         {
             task.id: task
             for task in db.scalars(
                 select(GenerationTask).where(
                     GenerationTask.user_id == user_id,
-                    GenerationTask.status.in_(CREATING_STATUSES),
+                    GenerationTask.status.in_(task_statuses),
                     GenerationTask.id.in_(task_ids),
                 )
             ).all()
@@ -152,7 +187,9 @@ def _get_page_items(
                     work_id=-task.id,
                     task_id=task.task_id,
                     title=str(prompt)[:255] if prompt else "未命名任务",
-                    status="creating",
+                    status=(
+                        "creating" if task.status in CREATING_STATUSES else "draft"
+                    ),
                     type_name=TYPE_NAMES.get(task.task_type, "创作任务"),
                     created_at=task.created_at,
                     media_url=None,
@@ -165,7 +202,7 @@ def delete_work(db: Session, user_id: int, work_id: int) -> None:
     """删除本人作品；不存在或不属于本人时统一按不存在处理，避免暴露他人数据。"""
     work = db.scalar(select(Work).where(Work.id == work_id, Work.user_id == user_id))
     if work is None:
-        raise ApiError(code=40404, message="作品不存在", status_code=404)
+        raise ApiError(message="作品不存在", status_code=404)
     # 只删除作品记录，来源任务与积分流水保留，便于追溯创作历史。
     db.delete(work)
     db.commit()

@@ -9,6 +9,7 @@ from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import SessionLocal
 from app.services.siliconflow_video import get_video_status, submit_video
+from app.services.tasks import fail_task
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def run_one() -> bool:
         )
         if task:
             task.status = "processing"
-            task_id, data = task.id, dict(task.input_data)
+            task_id, user_id, data = task.id, task.user_id, dict(task.input_data)
             db.commit()
         else:
             task = db.scalar(
@@ -46,7 +47,7 @@ def run_one() -> bool:
                 or not task.result_data.get("provider_id")
             ):
                 return False
-            task_id, data = task.id, None
+            task_id, user_id, data = task.id, task.user_id, None
             provider_id = task.result_data["provider_id"]
     if data is not None:
         try:
@@ -62,11 +63,18 @@ def run_one() -> bool:
             return True
     try:
         result = get_video_status(provider_id)
+        status = result.get("status")
+        if status == "Failed":
+            # 第三方明确失败且未产出视频，按未计费处理并退回本次扣费。
+            with SessionLocal() as db:
+                fail_task(
+                    db, user_id, task_id, "视频生成失败，请稍后重试", refund=True
+                )
+            return True
         with SessionLocal() as db:
             task = db.get(GenerationTask, task_id, with_for_update=True)
             if not task or task.status != "processing":
                 return True
-            status = result.get("status")
             if status == "Succeed":
                 videos = (result.get("results") or {}).get("videos") or []
                 url = (
@@ -88,9 +96,6 @@ def run_one() -> bool:
                 )
                 task.result_data = {"provider_id": provider_id, "result_urls": [url]}
                 task.status, task.progress = "completed", 100
-            elif status == "Failed":
-                task.status = "failed"
-                task.error_message = "视频生成失败，请稍后重试"
             task.updated_at = func.now()
             db.commit()
     except Exception:

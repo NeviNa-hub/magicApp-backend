@@ -13,8 +13,8 @@ class VideoTaskInput(BaseModel):
     mode: Literal["text"] = Field(description="仅支持 text 文字生视频")
     ratio: Literal["1:1", "9:16", "16:9"] = Field(description="页面支持的画面比例")
     prompt: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
-    ] = Field(description="视频内容描述，1–300 字符")
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)
+    ] = Field(description="视频内容描述，1–1000 字符")
 
 
 class VideoTaskResult(BaseModel):
@@ -22,3 +22,4 @@ class VideoTaskResult(BaseModel):
 
     task_id: str = Field(description="任务公开标识")
     status: str = Field(description="当前任务状态")
+    cost_points: int = Field(description="本次任务实际扣除的积分")

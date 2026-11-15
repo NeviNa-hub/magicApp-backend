@@ -52,12 +52,11 @@ async def save_image(
             while chunk := await file.read(CHUNK_SIZE):
                 size += len(chunk)
                 if size > MAX_IMAGE_BYTES:
-                    raise ApiError(
-                        code=41301, message="图片不能超过 5 MB", status_code=413
+                    raise ApiError(message="图片不能超过 5 MB", status_code=413
                     )
                 destination.write(chunk)
         if not size:
-            raise ApiError(code=40001, message="图片文件不能为空", status_code=400)
+            raise ApiError(message="图片文件不能为空", status_code=400)
 
         try:
             with warnings.catch_warnings():
@@ -65,14 +64,11 @@ async def save_image(
                 with Image.open(temp_path) as image:
                     image_format = image.format
                     if image_format not in FORMATS:
-                        raise ApiError(
-                            code=40002,
-                            message="仅支持 JPEG、PNG、WebP 图片",
+                        raise ApiError(message="仅支持 JPEG、PNG、WebP 图片",
                             status_code=400,
                         )
                     if image.width * image.height > MAX_IMAGE_PIXELS:
-                        raise ApiError(
-                            code=40002, message="图片尺寸过大", status_code=400
+                        raise ApiError(message="图片尺寸过大", status_code=400
                         )
                     image.verify()
         except (
@@ -82,8 +78,7 @@ async def save_image(
             Image.DecompressionBombError,
             Image.DecompressionBombWarning,
         ) as error:
-            raise ApiError(
-                code=40002, message="图片文件无效或尺寸过大", status_code=400
+            raise ApiError(message="图片文件无效或尺寸过大", status_code=400
             ) from error
 
         content_type, suffix = FORMATS[image_format]
@@ -122,9 +117,9 @@ def get_image(db: Session, user_id: int, upload_id: int) -> tuple[Asset, Path]:
         select(Asset).where(Asset.id == upload_id, Asset.user_id == user_id)
     )
     if asset is None:
-        raise ApiError(code=40403, message="图片不存在", status_code=404)
+        raise ApiError(message="图片不存在", status_code=404)
     directory = _storage_dir()
     path = (directory / asset.storage_key).resolve()
     if path.parent != directory or not path.is_file():
-        raise ApiError(code=40403, message="图片不存在", status_code=404)
+        raise ApiError(message="图片不存在", status_code=404)
     return asset, path

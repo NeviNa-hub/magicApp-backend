@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.api.schemas.video import VideoTaskInput
 from app.core.errors import ApiError
+from app.core.pricing import quote_task
 from app.db.models.account import Account, PointLedger
 from app.db.models.task import GenerationTask
 
@@ -19,7 +20,7 @@ def create_video_task(
         select(Account).where(Account.user_id == user_id).with_for_update()
     )
     if account is None:
-        raise ApiError(code=40901, message="积分账户不存在", status_code=409)
+        raise ApiError(message="积分账户不存在", status_code=409)
     data = payload.model_dump()
     existing = db.scalar(
         select(GenerationTask).where(
@@ -28,13 +29,14 @@ def create_video_task(
     )
     if existing:
         if existing.task_type != "video" or existing.input_data != data:
-            raise ApiError(
-                code=40903, message="幂等标识已用于其他请求", status_code=409
+            raise ApiError(message="幂等标识已用于其他请求", status_code=409
             )
         return existing
-    if account.points_balance < 5:
-        raise ApiError(code=40901, message="积分不足", status_code=409)
-    account.points_balance -= 5
+    # 视频输出规模占主要成本，提示词 token 在其基础上叠加。
+    quote = quote_task("video", payload.prompt)
+    if account.points_balance < quote.cost_points:
+        raise ApiError(message="积分不足", status_code=409)
+    account.points_balance -= quote.cost_points
     task = GenerationTask(
         task_id=uuid4().hex,
         user_id=user_id,
@@ -42,13 +44,13 @@ def create_video_task(
         task_type="video",
         status="pending",
         input_data=data,
-        cost_points=5,
+        cost_points=quote.cost_points,
     )
     db.add(task)
     db.add(
         PointLedger(
             user_id=user_id,
-            delta=-5,
+            delta=-quote.cost_points,
             balance_after=account.points_balance,
             reason="video_generation",
             reference_id=task.task_id,
