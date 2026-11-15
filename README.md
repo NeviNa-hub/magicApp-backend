@@ -65,6 +65,10 @@ curl -fsS http://127.0.0.1:8001/api/ready
 
 就绪接口应返回 HTTP 200，且 `data.status` 为 `ready`、`data.database` 为 `ok`。
 
+激活agent worker：
+```bash
+python -m app.workers.image_generation
+```
 ## 后续更新
 
 先在开发机提交并推送代码到服务器使用的 Git 分支。然后在服务器执行：
