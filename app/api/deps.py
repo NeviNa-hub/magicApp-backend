@@ -20,13 +20,13 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 def _unauthorized() -> ApiError:
     """构造“未登录或会话失效”的统一业务错误。"""
-    return ApiError(code=40102, message="未登录或登录已过期", status_code=401)
+    return ApiError(message="未登录或登录已过期", status_code=401)
 
 
 def _ensure_user_active(user: User) -> None:
     """停用用户拒绝逻辑的唯一接入点。"""
     if not user.is_active:
-        raise ApiError(code=40301, message="账号已停用", status_code=403)
+        raise ApiError(message="账号已停用", status_code=403)
 
 
 def get_current_session(

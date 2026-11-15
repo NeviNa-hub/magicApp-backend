@@ -15,8 +15,8 @@ from app.db.session import engine
 router = APIRouter(tags=["health"])
 logger = logging.getLogger(__name__)
 
-# 数据库或迁移未就绪沿用现有的服务端错误码。
-_NOT_READY_CODE = 50001
+# 就绪检查失败返回 503，响应 code 与 HTTP 状态码保持一致。
+_NOT_READY_CODE = 503
 
 _REASON_MESSAGES = {
     "database_unavailable": "数据库暂不可用",

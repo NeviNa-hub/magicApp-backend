@@ -27,12 +27,16 @@ def create_task(
     user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
-    """创建图片优化任务并扣除 1 积分，重复请求应使用原幂等键。"""
+    """创建图片优化任务并按提示词 token 扣费，重复请求应使用原幂等键。"""
     if not idempotency_key.strip():
-        raise ApiError(code=40001, message="幂等标识不能为空", status_code=400)
+        raise ApiError(message="幂等标识不能为空", status_code=400)
     if not get_settings().siliconflow_api_key.strip():
-        raise ApiError(code=50302, message="图片优化服务尚未配置", status_code=503)
+        raise ApiError(message="图片优化服务尚未配置", status_code=503)
     task = create_optimization_task(db, user.id, idempotency_key, payload)
     return success(
-        ImageOptimizationResult(task_id=task.task_id, status=task.status).model_dump()
+        ImageOptimizationResult(
+            task_id=task.task_id,
+            status=task.status,
+            cost_points=task.cost_points,
+        ).model_dump()
     )

@@ -22,7 +22,7 @@ def list_library(
     user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
-    """查询本人作品和进行中的任务；草稿暂为空。"""
+    """查询本人作品、进行中的任务和已取消的草稿。"""
     result = get_library(db, user.id, status, page, page_size)
     return success(result.model_dump(mode="json"))
 

@@ -21,8 +21,14 @@ def create_task(
     user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
-    """创建任务并扣除 2 积分；Idempotency-Key 用于同一请求安全重试。"""
+    """创建任务并按提示词 token 扣费；Idempotency-Key 用于同一请求安全重试。"""
     if not get_settings().siliconflow_api_key.strip():
-        raise ApiError(code=50302, message="文字生图服务尚未配置", status_code=503)
+        raise ApiError(message="文字生图服务尚未配置", status_code=503)
     task = create_image_task(db, user.id, idempotency_key, payload)
-    return success(ImageGenerationResult(task_id=task.task_id, status=task.status).model_dump())
+    return success(
+        ImageGenerationResult(
+            task_id=task.task_id,
+            status=task.status,
+            cost_points=task.cost_points,
+        ).model_dump()
+    )

@@ -24,12 +24,16 @@ def create_task(
     user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
-    """提交文字生视频任务，成功创建后扣除 5 积分。"""
+    """提交文字生视频任务，成功创建后按提示词 token 扣费。"""
     if not idempotency_key.strip():
-        raise ApiError(code=40001, message="幂等标识不能为空", status_code=400)
+        raise ApiError(message="幂等标识不能为空", status_code=400)
     if not get_settings().siliconflow_api_key.strip():
-        raise ApiError(code=50302, message="视频生成服务尚未配置", status_code=503)
+        raise ApiError(message="视频生成服务尚未配置", status_code=503)
     task = create_video_task(db, user.id, idempotency_key, payload)
     return success(
-        VideoTaskResult(task_id=task.task_id, status=task.status).model_dump()
+        VideoTaskResult(
+            task_id=task.task_id,
+            status=task.status,
+            cost_points=task.cost_points,
+        ).model_dump()
     )

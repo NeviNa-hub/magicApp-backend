@@ -1,7 +1,7 @@
 """用户积分查询接口。"""
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -10,6 +10,7 @@ from app.core.responses import ApiResponse, success
 from app.db.models.account import Account, PointLedger
 from app.db.models.user import User
 from app.db.session import get_db
+from app.services.tasks import REFUND_REASONS
 
 router = APIRouter(prefix="/points", tags=["积分"])
 
@@ -21,7 +22,7 @@ def get_my_points(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> ApiResponse:
-    """查询当前用户剩余积分和已使用积分流水。
+    """查询当前用户剩余积分、净已用积分和积分流水。
 
     分页约定：page 从 1 开始，page_size 默认 20、最大 100；流水按
     created_at 倒序、同一时间按 id 倒序，保证翻页结果稳定。
@@ -31,17 +32,31 @@ def get_my_points(
     if points_balance is None:
         points_balance = 0
 
-    # 只统计负数变动：正数流水属于加点，暂不涉及积分回退。
     spent_cond = (PointLedger.user_id == user.id, PointLedger.delta < 0)
-
-    total = db.scalar(select(func.count()).select_from(PointLedger).where(*spent_cond)) or 0
-    used_points = (
+    refund_cond = (
+        PointLedger.user_id == user.id,
+        PointLedger.reason.in_(REFUND_REASONS),
+    )
+    # 已用积分按净消耗统计：扣费合计减去取消与失败退款，保证与余额一致。
+    spent_points = (
         db.scalar(select(func.coalesce(-func.sum(PointLedger.delta), 0)).where(*spent_cond)) or 0
     )
+    refund_points = (
+        db.scalar(select(func.coalesce(func.sum(PointLedger.delta), 0)).where(*refund_cond)) or 0
+    )
+    used_points = spent_points - refund_points
+
+    # 流水同时返回扣费与退款，正负金额可直接展示给用户。
+    ledger_cond = (
+        PointLedger.user_id == user.id,
+        or_(PointLedger.delta < 0, PointLedger.reason.in_(REFUND_REASONS)),
+    )
+
+    total = db.scalar(select(func.count()).select_from(PointLedger).where(*ledger_cond)) or 0
 
     ledgers = db.scalars(
         select(PointLedger)
-        .where(*spent_cond)
+        .where(*ledger_cond)
         .order_by(PointLedger.created_at.desc(), PointLedger.id.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)

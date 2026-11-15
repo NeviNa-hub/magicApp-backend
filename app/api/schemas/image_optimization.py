@@ -14,8 +14,8 @@ class ImageOptimizationInput(BaseModel):
     ] = Field(description="已上传图片的资产标识")
     prompt: Annotated[
         str,
-        StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
-    ] = Field(description="优化要求，1–200 字符")
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=1000),
+    ] = Field(description="优化要求，1–1000 字符")
 
 
 class ImageOptimizationResult(BaseModel):
@@ -23,3 +23,4 @@ class ImageOptimizationResult(BaseModel):
 
     task_id: str = Field(description="任务的公开标识")
     status: str = Field(description="任务当前状态")
+    cost_points: int = Field(description="本次任务实际扣除的积分")

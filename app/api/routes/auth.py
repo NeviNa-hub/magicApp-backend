@@ -30,17 +30,17 @@ def login_user(
 ) -> ApiResponse:
     """校验账号密码并创建一个有过期时间的登录会话。
 
-    账号不存在、密码错误、账号停用分别返回不同业务码，便于前端引导。
+    账号不存在、密码错误、账号停用分别返回不同提示，便于前端引导。
     """
     user = db.scalar(select(User).where(User.account == payload.account))
     if user is None:
-        raise ApiError(code=40103, message="账号不存在，请注册", status_code=401)
+        raise ApiError(message="账号不存在，请注册", status_code=401)
     if not verify_password(payload.password, user.password_hash):
-        raise ApiError(code=40101, message="密码错误", status_code=401)
+        raise ApiError(message="密码错误", status_code=401)
 
     # 停用账号不签发会话；先校验密码，避免错误密码也能探出停用状态。
     if not user.is_active:
-        raise ApiError(code=40301, message="账号已停用", status_code=403)
+        raise ApiError(message="账号已停用", status_code=403)
 
     # 随机令牌只返回给客户端；数据库仅保存其摘要，避免数据库泄露即可直接冒用令牌。
     access_token = secrets.token_urlsafe(32)
@@ -73,7 +73,7 @@ def register_user(
     """创建新账号，并以哈希形式保存密码。"""
     existing_user = db.scalar(select(User).where(User.account == payload.account))
     if existing_user:
-        raise ApiError(code=40902, message="账号已注册", status_code=409)
+        raise ApiError(message="账号已注册", status_code=409)
 
     user = User(
         username=payload.username,
@@ -89,7 +89,7 @@ def register_user(
         db.commit()
     except IntegrityError as error:
         db.rollback()
-        raise ApiError(code=40902, message="账号已注册", status_code=409) from error
+        raise ApiError(message="账号已注册", status_code=409) from error
 
     # flush 时已回填自增 id；commit 后对象仍在会话中，可直接构造公开响应。
     return success(
@@ -109,7 +109,7 @@ def logout_user(
 ) -> ApiResponse:
     """撤销当前令牌对应的会话。
 
-    令牌无效、已过期或已撤销时统一返回 401（code=40102），
+    令牌无效、已过期或已撤销时统一返回 401，
     因此重复登出与未登录调用行为一致，不会泄露会话是否存在。
     """
     user_session.revoked_at = datetime.now(timezone.utc)
