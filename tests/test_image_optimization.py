@@ -101,6 +101,8 @@ class OptimizationTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["task_id"], draft_id)
+        task = self.client.get(f"/api/tasks/{draft_id}").json()["data"]
+        self.assertEqual(task["original_upload_id"], "1")
         self.assertEqual(
             self.client.post(
                 "/api/image-optimization/tasks",

@@ -10,6 +10,7 @@ class TaskResult(BaseModel):
     task_type: str = Field(description="任务类型，例如 image")
     status: str = Field(description="任务状态：pending、processing、completed、failed 或 canceled")
     progress: int | None = Field(description="生成进度，0–100；未知时为 null")
+    original_upload_id: str | None = Field(default=None, description="图片优化任务的原图资源标识")
     result_urls: list[str] = Field(description="完成后的结果地址；生成图片链接约一小时有效")
     error_message: str | None = Field(description="任务失败时的提示，其余状态为 null")
     cost_points: int = Field(description="创建任务时实际扣除的积分，取消后展示已退回金额")

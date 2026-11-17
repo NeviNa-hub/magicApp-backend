@@ -26,6 +26,10 @@ def _build_task_result(db: Session, task: GenerationTask) -> dict:
     urls = result.get("result_urls", []) if task.status == "completed" else []
     if not isinstance(urls, list):
         urls = []
+    # 原图仍由上传接口校验归属，不在任务接口公开文件内容。
+    source = task.input_data if isinstance(task.input_data, dict) else {}
+    upload_id = source.get("upload_id") if task.task_type == "optimization" else None
+    original_upload_id = upload_id if isinstance(upload_id, str) and upload_id.isdigit() else None
     net_paid, refunded = task_billing_state(db, task)
     return TaskResult(
         task_id=task.task_id,
@@ -33,6 +37,7 @@ def _build_task_result(db: Session, task: GenerationTask) -> dict:
         status=task.status,
         progress=100 if task.status == "completed" else task.progress,
         result_urls=[url for url in urls if isinstance(url, str)],
+        original_upload_id=original_upload_id,
         error_message=task.error_message if task.status == "failed" else None,
         cost_points=task.cost_points,
         refund_points=refunded,
