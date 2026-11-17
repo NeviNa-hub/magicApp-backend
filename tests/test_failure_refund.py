@@ -87,10 +87,37 @@ class FailureRefundTest(unittest.TestCase):
         """按原因读取积分流水。"""
         with Session(self.engine) as db:
             return list(
-                db.scalars(
-                    select(PointLedger).where(PointLedger.reason == reason)
-                )
+                db.scalars(select(PointLedger).where(PointLedger.reason == reason))
             )
+        
+    # 测试草稿转换为图片任务
+    def test_draft_conversion_image(self):
+        data = {"prompt": "mountain", "style": "ink", "ratio": "1:1"}
+        response = self.client.post(
+            "/api/drafts",
+            json={"task_type": "image", "title": "草稿", "input_data": data},
+        )
+        self.assertEqual(response.status_code, 200)
+        draft_id = response.json()["data"]["id"]
+        payload = {**data, "draft_id": draft_id}
+        response = self.client.post(
+            "/api/text-to-image/tasks",
+            json=payload,
+            headers={"Idempotency-Key": "draft-test"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["task_id"], draft_id)
+        self.assertEqual(
+            self.client.post(
+                "/api/text-to-image/tasks",
+                json=payload,
+                headers={"Idempotency-Key": "draft-test"},
+            ).status_code,
+            200,
+        )
+        self.assertEqual(self.client.get(f"/api/drafts/{draft_id}").status_code, 404)
+        with Session(self.engine) as db:
+            self.assertEqual(len(db.scalars(select(PointLedger)).all()), 1)
 
     def test_provider_failure_refunds_once(self):
         task_id = self.create_image_task()

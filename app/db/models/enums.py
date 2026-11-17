@@ -10,6 +10,7 @@ from enum import Enum
 class GenerationStatus(str, Enum):
     """生成流程的有限状态集合。"""
 
+    draft = "draft"
     pending = "pending"
     processing = "processing"
     completed = "completed"
@@ -17,5 +18,12 @@ class GenerationStatus(str, Enum):
     canceled = "canceled"
 
 
-# 模型层 CHECK 约束片段，保证与迁移 0006 的状态集合一致。
-STATUS_CHECK_SQL = "status IN (" + ", ".join(f"'{s.value}'" for s in GenerationStatus) + ")"
+# 任务允许编辑草稿；作品状态仍遵循原有状态集合。
+STATUS_CHECK_SQL = (
+    "status IN (" + ", ".join(f"'{s.value}'" for s in GenerationStatus) + ")"
+)
+WORK_STATUS_CHECK_SQL = (
+    "status IN ("
+    + ", ".join(f"'{s.value}'" for s in GenerationStatus if s != GenerationStatus.draft)
+    + ")"
+)

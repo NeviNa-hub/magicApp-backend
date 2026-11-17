@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, StringConstraints
 class ImageOptimizationInput(BaseModel):
     """使用已上传的本人图片创建优化任务。"""
 
+    draft_id: str | None = Field(default=None, max_length=128, exclude=True)
+
     upload_id: Annotated[
         str,
         StringConstraints(strip_whitespace=True, pattern=r"^[1-9][0-9]{0,9}$"),

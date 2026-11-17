@@ -103,18 +103,22 @@ class LibraryTest(unittest.TestCase):
         self.assertEqual(creating["lists"][0]["task_id"], "one")
         self.assertEqual(creating["lists"][0]["work_id"], -1)
         self.assertEqual(creating["lists"][0]["status"], "creating")
-        # 取消的任务进入草稿，仍可在作品库中查看。
-        draft = self.client.get("/api/library?status=draft").json()["data"]
+        # 取消的任务进入已取消分类，仍可在作品库中查看。
+        draft = self.client.get("/api/library?status=canceled").json()["data"]
         self.assertEqual(len(draft["lists"]), 1)
         self.assertEqual(draft["lists"][0]["task_id"], "draft")
         self.assertEqual(draft["lists"][0]["title"], "已取消的草稿")
-        self.assertEqual(draft["lists"][0]["status"], "draft")
+        self.assertEqual(draft["lists"][0]["status"], "canceled")
         self.assertEqual(
-            self.client.get("/api/library?status=completed").json()["data"]["lists"][0]["title"],
+            self.client.get("/api/library?status=completed").json()["data"]["lists"][0][
+                "title"
+            ],
             "本人作品",
         )
         self.assertEqual(self.client.get("/api/library?page=0").status_code, 422)
-        self.assertEqual(self.client.get("/api/library?status=unknown").status_code, 422)
+        self.assertEqual(
+            self.client.get("/api/library?status=unknown").status_code, 422
+        )
 
     def test_search_type_sort_and_pagination(self):
         with Session(self.engine) as db:
@@ -137,14 +141,14 @@ class LibraryTest(unittest.TestCase):
         self.assertEqual(result["page_info"]["total"], 2)
         self.assertEqual([tab["count"] for tab in result["tabs"]], [4, 1, 2, 1])
         self.assertEqual(
-            self.client.get("/api/library", params={"keyword": "%"}).json()["data"]["page_info"][
-                "total"
-            ],
+            self.client.get("/api/library", params={"keyword": "%"}).json()["data"][
+                "page_info"
+            ]["total"],
             0,
         )
-        video = self.client.get("/api/library", params={"type": "video", "sort": "oldest"}).json()[
-            "data"
-        ]
+        video = self.client.get(
+            "/api/library", params={"type": "video", "sort": "oldest"}
+        ).json()["data"]
         self.assertEqual(video["page_info"]["total"], 1)
         self.assertEqual(video["lists"][0]["task_id"], "video")
         self.assertEqual(self.client.get("/api/library?sort=invalid").status_code, 422)
@@ -152,9 +156,9 @@ class LibraryTest(unittest.TestCase):
     def test_sort_and_filtered_page_order(self):
         # 相同时间按主键稳定排序，跨页不会重复或遗漏。
         newest = [
-            self.client.get("/api/library", params={"page": page, "page_size": 1}).json()["data"][
-                "lists"
-            ][0]["work_id"]
+            self.client.get(
+                "/api/library", params={"page": page, "page_size": 1}
+            ).json()["data"]["lists"][0]["work_id"]
             for page in range(1, 4)
         ]
         oldest = [
@@ -177,18 +181,39 @@ class LibraryTest(unittest.TestCase):
         response = self.client.put("/api/library/works/1", json={"title": "  新标题  "})
         self.assertEqual(response.json()["data"], {"work_id": 1, "title": "新标题"})
         self.assertEqual(
-            self.client.put("/api/library/works/2", json={"title": "越权"}).status_code, 404
+            self.client.put("/api/library/works/2", json={"title": "越权"}).status_code,
+            404,
         )
         self.assertEqual(
-            self.client.put("/api/library/works/1", json={"title": "  "}).status_code, 422
+            self.client.put("/api/library/works/1", json={"title": "  "}).status_code,
+            422,
         )
         self.assertEqual(
-            self.client.put("/api/library/works/1", json={"title": "a" * 51}).status_code, 422
+            self.client.put(
+                "/api/library/works/1", json={"title": "a" * 51}
+            ).status_code,
+            422,
         )
         del app.dependency_overrides[get_current_user]
         self.assertEqual(
-            self.client.put("/api/library/works/1", json={"title": "标题"}).status_code, 401
+            self.client.put("/api/library/works/1", json={"title": "标题"}).status_code,
+            401,
         )
+
+    def test_work_media_requires_owner_and_existing_media(self):
+        response = self.client.get("/api/library/works/1/media")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["media_url"], "https://example.com/a")
+        self.assertEqual(self.client.get("/api/library/works/2/media").status_code, 404)
+        self.assertEqual(
+            self.client.get("/api/library/works/999/media").status_code, 404
+        )
+        with Session(self.engine) as db:
+            db.get(Work, 1).media_url = None
+            db.commit()
+        self.assertEqual(self.client.get("/api/library/works/1/media").status_code, 404)
+        del app.dependency_overrides[get_current_user]
+        self.assertEqual(self.client.get("/api/library/works/1/media").status_code, 401)
 
     def test_authentication_required(self):
         del app.dependency_overrides[get_current_user]

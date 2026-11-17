@@ -32,8 +32,7 @@ def create_optimization_task(
     # 对同一用户串行校验幂等键，网络重试不会创建新任务或再次扣费。
     if existing:
         if existing.task_type != "optimization" or existing.input_data != data:
-            raise ApiError(message="幂等标识已用于其他请求", status_code=409
-            )
+            raise ApiError(message="幂等标识已用于其他请求", status_code=409)
         return existing
 
     # 在扣积分之前验证图片存在并属于当前用户。
@@ -46,15 +45,34 @@ def create_optimization_task(
         raise ApiError(message="积分不足", status_code=409)
 
     account.points_balance -= quote.cost_points
-    task = GenerationTask(
-        task_id=uuid4().hex,
-        user_id=user_id,
-        idempotency_key=key,
-        task_type="optimization",
-        status="pending",
-        input_data=data,
-        cost_points=quote.cost_points,
-    )
+    if payload.draft_id:
+        # 账户锁和草稿锁共同防止重复扣费及重复提交。
+        task = db.scalar(
+            select(GenerationTask)
+            .where(
+                GenerationTask.user_id == user_id,
+                GenerationTask.task_id == payload.draft_id,
+                GenerationTask.task_type == "optimization",
+                GenerationTask.status == "draft",
+            )
+            .with_for_update()
+        )
+        if task is None:
+            raise ApiError(message="草稿不存在或已提交", status_code=409)
+        task.idempotency_key = key
+        task.status = "pending"
+        task.input_data = data
+        task.cost_points = quote.cost_points
+    else:
+        task = GenerationTask(
+            task_id=uuid4().hex,
+            user_id=user_id,
+            idempotency_key=key,
+            task_type="optimization",
+            status="pending",
+            input_data=data,
+            cost_points=quote.cost_points,
+        )
     db.add(task)
     db.add(
         PointLedger(

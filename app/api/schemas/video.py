@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 class VideoTaskInput(BaseModel):
     """仅支持文字生视频；图生视频暂不开放。"""
 
+    draft_id: str | None = Field(default=None, max_length=128, exclude=True)
+
     model_config = ConfigDict(extra="forbid")
 
     mode: Literal["text"] = Field(description="仅支持 text 文字生视频")

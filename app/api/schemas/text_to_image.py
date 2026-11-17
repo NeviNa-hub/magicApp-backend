@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, StringConstraints
 class ImageGenerationInput(BaseModel):
     """创建任务时提交的画面描述与画幅。"""
 
+    draft_id: str | None = Field(default=None, max_length=128, exclude=True)
+
     # 用户填写的画面描述，去除首尾空白后最多 1000 字符。
     prompt: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)

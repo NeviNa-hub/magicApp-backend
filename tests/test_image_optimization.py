@@ -16,9 +16,9 @@ from app.db.models.account import Account, PointLedger
 from app.db.models.asset import Asset
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
-from app.workers.image_generation import run_one
 from app.db.session import get_db
 from app.main import app
+from app.workers.image_generation import run_one
 
 
 class OptimizationTest(unittest.TestCase):
@@ -84,6 +84,34 @@ class OptimizationTest(unittest.TestCase):
         self.key_patch.stop()
         self.path_patch.stop()
         self.temp.cleanup()
+
+    def test_draft_conversion_optimization(self):
+        data = {"prompt": "clear", "upload_id": "1"}
+        response = self.client.post(
+            "/api/drafts",
+            json={"task_type": "optimization", "title": "草稿", "input_data": data},
+        )
+        self.assertEqual(response.status_code, 200)
+        draft_id = response.json()["data"]["id"]
+        payload = {**data, "draft_id": draft_id}
+        response = self.client.post(
+            "/api/image-optimization/tasks",
+            json=payload,
+            headers={"Idempotency-Key": "draft-test"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["task_id"], draft_id)
+        self.assertEqual(
+            self.client.post(
+                "/api/image-optimization/tasks",
+                json=payload,
+                headers={"Idempotency-Key": "draft-test"},
+            ).status_code,
+            200,
+        )
+        self.assertEqual(self.client.get(f"/api/drafts/{draft_id}").status_code, 404)
+        with Session(self.engine) as db:
+            self.assertEqual(len(db.scalars(select(PointLedger)).all()), 1)
 
     def test_creation_idempotency_and_insufficient_balance(self):
         payload = {"upload_id": "1", "prompt": "提高画质"}

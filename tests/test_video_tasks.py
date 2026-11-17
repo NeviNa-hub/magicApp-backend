@@ -3,10 +3,12 @@
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+
 from app.api.deps import get_current_user
 from app.db.models.account import Account, PointLedger
 from app.db.models.task import GenerationTask
@@ -50,6 +52,66 @@ class VideoTaskTest(unittest.TestCase):
         app.dependency_overrides.clear()
         self.key_patch.stop()
         self.engine.dispose()
+
+    # 测试草稿创建和删除
+    def test_draft_crud_and_insufficient_balance(self):
+        payload = {
+            "task_type": "video",
+            "title": "草稿",
+            "input_data": {"prompt": "山", "mode": "text", "ratio": "16:9"},
+        }
+        draft = self.client.post("/api/drafts", json=payload).json()["data"]
+        self.assertEqual(self.client.get("/api/drafts").json()["data"]["total"], 1)
+        payload["title"] = "新名称"
+        self.assertEqual(
+            self.client.put(f"/api/drafts/{draft['id']}", json=payload).json()["data"][
+                "title"
+            ],
+            "新名称",
+        )
+        with Session(self.engine) as db:
+            db.scalar(select(Account).where(Account.user_id == 1)).points_balance = 0
+            db.commit()
+        body = {**payload["input_data"], "draft_id": draft["id"]}
+        self.assertEqual(
+            self.client.post(
+                "/api/video/tasks", json=body, headers={"Idempotency-Key": "poor"}
+            ).status_code,
+            409,
+        )
+        self.assertEqual(self.client.get(f"/api/drafts/{draft['id']}").status_code, 200)
+        self.assertEqual(
+            self.client.delete(f"/api/drafts/{draft['id']}").status_code, 200
+        )
+        self.assertEqual(self.client.get(f"/api/drafts/{draft['id']}").status_code, 404)
+
+    def test_draft_submit_is_atomic_and_idempotent(self):
+        payload = {
+            "task_type": "video",
+            "title": "草稿",
+            "input_data": {"prompt": "mountain", "mode": "text", "ratio": "16:9"},
+        }
+        draft = self.client.post("/api/drafts", json=payload).json()["data"]
+        body = {**payload["input_data"], "draft_id": draft["id"]}
+        headers = {"Idempotency-Key": "draft-key"}
+        response = self.client.post("/api/video/tasks", json=body, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["task_id"], draft["id"])
+        self.assertEqual(
+            self.client.post(
+                "/api/video/tasks", json=body, headers=headers
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/video/tasks", json=body, headers={"Idempotency-Key": "other-key"}
+            ).status_code,
+            409,
+        )
+        self.assertEqual(self.client.get(f"/api/drafts/{draft['id']}").status_code, 404)
+        with Session(self.engine) as db:
+            self.assertEqual(len(db.scalars(select(PointLedger)).all()), 1)
 
     def test_submit_retry_and_worker_completion(self):
         body = {"mode": "text", "prompt": "mountain", "ratio": "16:9"}
