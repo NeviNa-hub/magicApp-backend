@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class LibraryTab(BaseModel):
@@ -41,3 +41,15 @@ class LibraryResult(BaseModel):
     tabs: list[LibraryTab]
     page_info: LibraryPageInfo
     lists: list[LibraryItem]
+
+
+class UpdateWorkTitle(BaseModel):
+    """修改作品标题的请求。"""
+
+    title: str = Field(min_length=1, max_length=50)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def trim_title(cls, value: object) -> object:
+        """去掉标题首尾空白，再执行长度校验。"""
+        return value.strip() if isinstance(value, str) else value
