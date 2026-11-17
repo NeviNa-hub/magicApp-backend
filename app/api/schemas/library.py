@@ -5,14 +5,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 
-class LibraryTab(BaseModel):
-    """作品库状态及数量。"""
-
-    status: str = Field(description="筛选状态")
-    name: str = Field(description="状态显示名称")
-    count: int = Field(description="该状态的记录数量")
-
-
 class LibraryPageInfo(BaseModel):
     """当前筛选条件下的分页信息。"""
 
@@ -38,7 +30,6 @@ class LibraryItem(BaseModel):
 class LibraryResult(BaseModel):
     """作品库分页响应。"""
 
-    tabs: list[LibraryTab]
     page_info: LibraryPageInfo
     lists: list[LibraryItem]
 

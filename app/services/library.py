@@ -8,7 +8,6 @@ from app.api.schemas.library import (
     LibraryItem,
     LibraryPageInfo,
     LibraryResult,
-    LibraryTab,
 )
 from app.core.errors import ApiError
 from app.db.models.task import GenerationTask
@@ -30,49 +29,7 @@ def get_library(
     work_type: str = "all",
     sort: str = "newest",
 ) -> LibraryResult:
-    """查询本人创作中任务、已取消任务与已完成作品，返回各状态数量和当前页。"""
-    completed_count = (
-        db.scalar(
-            select(func.count())
-            .select_from(Work)
-            .where(Work.user_id == user_id, Work.status == "completed")
-        )
-        or 0
-    )
-    creating_count = (
-        db.scalar(
-            select(func.count())
-            .select_from(GenerationTask)
-            .where(
-                GenerationTask.user_id == user_id,
-                GenerationTask.status.in_(CREATING_STATUSES),
-            )
-        )
-        or 0
-    )
-    canceled_count = (
-        db.scalar(
-            select(func.count())
-            .select_from(GenerationTask)
-            .where(
-                GenerationTask.user_id == user_id,
-                GenerationTask.status.in_(CANCELED_STATUSES),
-            )
-        )
-        or 0
-    )
-    tabs = [
-        LibraryTab(
-            status="all",
-            name="全部",
-            count=completed_count + creating_count + canceled_count,
-        ),
-        LibraryTab(status="completed", name="已完成", count=completed_count),
-        LibraryTab(status="creating", name="创作中", count=creating_count),
-        # 已取消的任务保留在作品库供用户查看。
-        LibraryTab(status="canceled", name="已取消", count=canceled_count),
-    ]
-    # 标签数量保持全局状态统计；分页总数按搜索、类型及状态筛选。
+    """查询本人创作中任务、已取消任务与已完成作品，返回筛选后的总数和当前页。"""
     query = _build_filtered_query(user_id, status, keyword.strip(), work_type)
     total = db.scalar(select(func.count()).select_from(query)) or 0
     items = (
@@ -81,7 +38,6 @@ def get_library(
         else []
     )
     return LibraryResult(
-        tabs=tabs,
         page_info=LibraryPageInfo(page=page, page_size=page_size, total=total),
         lists=items,
     )

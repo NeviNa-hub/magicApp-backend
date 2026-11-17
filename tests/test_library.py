@@ -96,7 +96,7 @@ class LibraryTest(unittest.TestCase):
     def test_filter_pagination_and_isolation(self):
         data = self.client.get("/api/library?page_size=1").json()["data"]
         self.assertEqual(data["page_info"]["total"], 3)
-        self.assertEqual([tab["count"] for tab in data["tabs"]], [3, 1, 1, 1])
+        self.assertNotIn("tabs", data)
         second = self.client.get("/api/library?page_size=1&page=2").json()["data"]
         self.assertNotEqual(data["lists"][0]["work_id"], second["lists"][0]["work_id"])
         creating = self.client.get("/api/library?status=creating").json()["data"]
@@ -139,7 +139,6 @@ class LibraryTest(unittest.TestCase):
             "/api/library", params={"keyword": "本人任务", "type": "image"}
         ).json()["data"]
         self.assertEqual(result["page_info"]["total"], 2)
-        self.assertEqual([tab["count"] for tab in result["tabs"]], [4, 1, 2, 1])
         self.assertEqual(
             self.client.get("/api/library", params={"keyword": "%"}).json()["data"][
                 "page_info"
