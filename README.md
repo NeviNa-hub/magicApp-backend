@@ -65,10 +65,23 @@ curl -fsS http://127.0.0.1:8001/api/ready
 
 就绪接口应返回 HTTP 200，且 `data.status` 为 `ready`、`data.database` 为 `ok`。
 
-激活agent worker：
+启动后台 worker：
+
 ```bash
 python -m app.workers.image_generation
+python -m app.workers.video_generation
 ```
+
+两个进程需要同时常驻运行，分别处理不同的任务类型：
+
+| 进程 | 处理任务 |
+| --- | --- |
+| `image_generation` | 文字生图（image）、图片优化（optimization） |
+| `video_generation` | 视频生成（video） |
+
+当前没有一条命令同时启动两者，也没有 worker 在线检测。漏起视频进程时，视频任务会一直停留在
+`pending`，但创建时的积分已经扣除，需要人工核查。生产环境建议用 systemd 等服务分别托管。
+
 ## 后续更新
 
 先在开发机提交并推送代码到服务器使用的 Git 分支。然后在服务器执行：
@@ -101,9 +114,10 @@ systemctl start magicapp-api
 sudo systemctl restart magicapp-api
 ```
 
-启动图片生成 worker：
+启动后台 worker（图片与视频各一个进程，需同时运行）：
 ```bash
 python -m app.workers.image_generation
+python -m app.workers.video_generation
 ```
 
 每次更新后检查服务和数据库就绪状态：
