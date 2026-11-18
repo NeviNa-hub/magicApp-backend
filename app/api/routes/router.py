@@ -7,10 +7,13 @@ from app.api.routes.drafts import router as drafts_router
 from app.api.routes.health import router as health_router
 from app.api.routes.image_optimization import router as image_optimization_router
 from app.api.routes.library import router as library_router
+from app.api.routes.notifications import router as notifications_router
 from app.api.routes.points import router as points_router
 from app.api.routes.pricing import router as pricing_router
 from app.api.routes.profile import router as profile_router
+from app.api.routes.prompt_optimization import router as prompt_optimization_router
 from app.api.routes.tasks import router as tasks_router
+from app.api.routes.templates import router as templates_router
 from app.api.routes.text_to_image import router as text_to_image_router
 from app.api.routes.uploads import router as uploads_router
 from app.api.routes.video import router as video_router
@@ -23,11 +26,14 @@ api_router.include_router(health_router)
 api_router.include_router(drafts_router)
 api_router.include_router(library_router)
 api_router.include_router(image_optimization_router)
+api_router.include_router(notifications_router)
 api_router.include_router(points_router)
 api_router.include_router(pricing_router)
 api_router.include_router(profile_router)
+api_router.include_router(prompt_optimization_router)
 
 api_router.include_router(tasks_router)
+api_router.include_router(templates_router)
 api_router.include_router(text_to_image_router)
 api_router.include_router(uploads_router)
 api_router.include_router(video_router)

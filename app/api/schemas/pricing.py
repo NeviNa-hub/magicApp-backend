@@ -5,21 +5,26 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, StringConstraints
 
 
+# 查询创作积分报价接口数据格式
 class PricingQuoteInput(BaseModel):
     """按任务类型和提示词查询预计消耗。"""
 
     task_type: Literal["image", "optimization", "video"] = Field(
         description="任务类型：image、optimization 或 video"
     )
-    # 提示词长度上限固定为 1000 字符；积分随 token 增长，不设价格上限。
-    prompt: Annotated[
-        str, StringConstraints(strip_whitespace=True, max_length=1000)
-    ] = Field(default="", description="提示词，可为空以查询基础价格")
-    style: Annotated[
-        str, StringConstraints(strip_whitespace=True, max_length=64)
-    ] = Field(default="", description="画风文案，仅文字生图会拼入模型提示词")
+    # 提示词长度上限固定为 800 字符；积分随 token 增长，不设价格上限。
+    prompt: Annotated[str, StringConstraints(strip_whitespace=True, max_length=800)] = (
+        Field(default="", description="提示词，可为空以查询基础价格")
+    )
+    duration: int = Field(
+        default=5, ge=5, le=15, strict=True, description="视频时长，单位秒"
+    )
+    style: Annotated[str, StringConstraints(strip_whitespace=True, max_length=64)] = (
+        Field(default="", description="画风文案，仅文字生图会拼入模型提示词")
+    )
 
 
+# 查询创作积分报价接口数据格式
 class PricingQuoteResult(BaseModel):
     """预计 token 与积分消耗。"""
 

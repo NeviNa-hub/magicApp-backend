@@ -11,7 +11,7 @@ from app.core.pricing import quote_task
 from app.db.models.account import Account, PointLedger
 from app.db.models.task import GenerationTask
 
-
+# 视频任务创建服务
 def create_video_task(
     db: Session, user_id: int, key: str, payload: VideoTaskInput
 ) -> GenerationTask:
@@ -28,11 +28,14 @@ def create_video_task(
         )
     )
     if existing:
-        if existing.task_type != "video" or existing.input_data != data:
+        # 旧任务没有 duration，按模型原默认 5 秒比较幂等参数。
+        existing_data = dict(existing.input_data)
+        existing_data.setdefault("duration", 5)
+        if existing.task_type != "video" or existing_data != data:
             raise ApiError(message="幂等标识已用于其他请求", status_code=409)
         return existing
     # 视频输出规模占主要成本，提示词 token 在其基础上叠加。
-    quote = quote_task("video", payload.prompt)
+    quote = quote_task("video", payload.prompt, duration=payload.duration)
     if account.points_balance < quote.cost_points:
         raise ApiError(message="积分不足", status_code=409)
     account.points_balance -= quote.cost_points

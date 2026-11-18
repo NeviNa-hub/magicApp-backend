@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_user
 from app.db.models.account import Account, PointLedger
+from app.db.models.file_deletion import PendingFileDeletion
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import get_db
@@ -18,6 +19,7 @@ from app.main import app
 from app.workers.video_generation import run_one
 
 
+# 视频任务测试
 class VideoTaskTest(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine(
@@ -28,6 +30,7 @@ class VideoTaskTest(unittest.TestCase):
             PointLedger.__table__,
             GenerationTask.__table__,
             Work.__table__,
+            PendingFileDeletion.__table__,
         ):
             table.create(self.engine)
         with Session(self.engine) as db:
@@ -154,6 +157,73 @@ class VideoTaskTest(unittest.TestCase):
             self.assertEqual(db.scalar(select(Account.points_balance)), 0)
             self.assertEqual(len(db.scalars(select(PointLedger)).all()), 1)
             self.assertEqual(db.scalar(select(Work.media_type)), "video")
+
+    def test_duration_quote_charge_and_provider_payload(self):
+        """报价、扣费、模型参数使用同一时长，旧任务按 5 秒兼容。"""
+        with Session(self.engine) as db:
+            db.scalar(select(Account)).points_balance = 30
+            db.commit()
+        body = {"mode": "text", "ratio": "16:9", "prompt": "mountain", "duration": 10}
+        quote = self.client.post(
+            "/api/pricing/quote",
+            json={"task_type": "video", "prompt": body["prompt"], "duration": 10},
+        ).json()["data"]
+        response = self.client.post(
+            "/api/video/tasks", json=body, headers={"Idempotency-Key": "duration-10"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["cost_points"], quote["cost_points"])
+        with Session(self.engine) as db:
+            self.assertEqual(
+                db.scalar(select(GenerationTask)).input_data["duration"], 10
+            )
+        self.assertEqual(
+            self.client.post(
+                "/api/video/tasks",
+                json={**body, "duration": 16},
+                headers={"Idempotency-Key": "invalid"},
+            ).status_code,
+            422,
+        )
+        from app.services.siliconflow_video import submit_video
+
+        with (
+            patch(
+                "app.services.siliconflow_video.get_settings",
+                return_value=SimpleNamespace(siliconflow_video_model="test"),
+            ),
+            patch(
+                "app.services.siliconflow_video._post", return_value={"requestId": "id"}
+            ) as post,
+        ):
+            submit_video(body)
+            self.assertEqual(post.call_args.args[1]["duration"], 10)
+            submit_video({"prompt": "old", "ratio": "1:1"})
+            self.assertEqual(post.call_args.args[1]["duration"], 5)
+        old_body = {"mode": "text", "ratio": "1:1", "prompt": "old"}
+        old = self.client.post(
+            "/api/video/tasks", json=old_body, headers={"Idempotency-Key": "old-key"}
+        )
+        self.assertEqual(old.status_code, 200)
+        with Session(self.engine) as db:
+            task = db.scalar(
+                select(GenerationTask).where(
+                    GenerationTask.task_id == old.json()["data"]["task_id"]
+                )
+            )
+            task.input_data = {
+                key: value
+                for key, value in task.input_data.items()
+                if key != "duration"
+            }
+            db.commit()
+        repeated = self.client.post(
+            "/api/video/tasks", json=old_body, headers={"Idempotency-Key": "old-key"}
+        )
+        self.assertEqual(repeated.status_code, 200)
+        self.assertEqual(
+            repeated.json()["data"]["task_id"], old.json()["data"]["task_id"]
+        )
 
 
 if __name__ == "__main__":

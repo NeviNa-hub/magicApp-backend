@@ -3,6 +3,7 @@
 from app.db.models.account import Account, PointLedger
 from app.db.models.asset import Asset
 from app.db.models.base import TimestampMixin
+from app.db.models.file_deletion import PendingFileDeletion
 from app.db.models.session_model import UserSession
 from app.db.models.task import GenerationTask
 from app.db.models.user import User
@@ -12,6 +13,7 @@ __all__ = [
     "Account",
     "Asset",
     "GenerationTask",
+    "PendingFileDeletion",
     "PointLedger",
     "TimestampMixin",
     "User",

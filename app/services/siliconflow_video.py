@@ -6,6 +6,7 @@ from urllib.request import Request, urlopen
 from app.core.config import get_settings
 
 
+# 硅基流动视频接口客户端
 def _post(path: str, body: dict) -> dict:
     settings = get_settings()
     request = Request(
@@ -21,6 +22,7 @@ def _post(path: str, body: dict) -> dict:
         return json.load(response)
 
 
+# 视频提交服务
 def submit_video(data: dict) -> str:
     """将文字和画幅提交给视频模型，返回第三方请求标识。"""
     result = _post(
@@ -29,6 +31,7 @@ def submit_video(data: dict) -> str:
             "model": get_settings().siliconflow_video_model,
             "prompt": f"{data['prompt']}\n画幅比例：{data['ratio']}",
             "ratio": data["ratio"],
+            "duration": data.get("duration", 5),
         },
     )
     request_id = result.get("requestId")
@@ -37,6 +40,7 @@ def submit_video(data: dict) -> str:
     return request_id
 
 
+# 视频状态查询服务
 def get_video_status(request_id: str) -> dict:
     """按第三方请求标识获取视频状态。"""
     return _post("/video/status", {"requestId": request_id})

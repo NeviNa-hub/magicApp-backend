@@ -14,13 +14,14 @@ from sqlalchemy.pool import StaticPool
 from app.api.deps import get_current_user
 from app.db.models.account import Account, PointLedger
 from app.db.models.asset import Asset
+from app.db.models.file_deletion import PendingFileDeletion
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import get_db
 from app.main import app
 from app.workers.image_generation import run_one
 
-
+# 图片优化测试
 class OptimizationTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -41,6 +42,7 @@ class OptimizationTest(unittest.TestCase):
             Asset.__table__,
             GenerationTask.__table__,
             Work.__table__,
+            PendingFileDeletion.__table__,
         ):
             table.create(self.engine)
         with Session(self.engine) as db:

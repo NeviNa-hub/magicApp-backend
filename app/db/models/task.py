@@ -1,11 +1,13 @@
 """定义异步生成任务及其处理结果。"""
 
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     BigInteger,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     String,
     Text,
@@ -17,7 +19,7 @@ from app.db.base import Base
 from app.db.models.base import TimestampMixin
 from app.db.models.enums import STATUS_CHECK_SQL
 
-
+# 生成任务模型
 class GenerationTask(TimestampMixin, Base):
     """保存任务状态、输入、结果和失败原因。"""
 
@@ -36,6 +38,9 @@ class GenerationTask(TimestampMixin, Base):
     input_data: Mapped[dict[str, Any]] = mapped_column(JSON)
     result_data: Mapped[dict[str, Any] | list[Any] | None] = mapped_column(JSON)
     error_message: Mapped[str | None] = mapped_column(Text)
+    notification_read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     cost_points: Mapped[int] = mapped_column(
         BigInteger, nullable=False, server_default="0"
     )

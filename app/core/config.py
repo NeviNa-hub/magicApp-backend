@@ -5,7 +5,7 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
+# 服务运行配置
 class Settings(BaseSettings):
     """服务运行配置；密码等私密值只放在不提交的 .env 文件中。"""
 
@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     siliconflow_base_url: str = "https://api.siliconflow.cn/v1"
     siliconflow_image_model: str = "Kwai-Kolors/Kolors"
     siliconflow_image_edit_model: str = "Qwen/Qwen-Image-Edit-2509"
+    siliconflow_text_model: str = "Qwen/Qwen3.5-4B"
     siliconflow_video_model: str = "MiniMaxAI/MiniMax-H3"
     siliconflow_timeout_seconds: int = Field(default=180, ge=1, le=1800)
     siliconflow_image_size_square: str = "1024x1024"

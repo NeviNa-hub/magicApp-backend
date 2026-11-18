@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import SessionLocal
+from app.services.file_deletions import cleanup_pending_file_deletions
 from app.services.siliconflow import generate_image
 from app.services.siliconflow_image_edit import optimize_image
 from app.services.tasks import fail_task
@@ -16,10 +17,12 @@ from app.services.uploads import get_image
 logger = logging.getLogger(__name__)
 
 
+# 图片任务处理函数
 def run_one() -> bool:
     """原子领取任务；失败记录为终态，不自动重复调用第三方。"""
     # 行锁和 SKIP LOCKED 让多个进程不会同时领取同一个等待任务。
     with SessionLocal() as db:
+        cleanup_pending_file_deletions(db, limit=5)
         task = db.scalar(
             select(GenerationTask)
             .where(
@@ -76,7 +79,9 @@ def run_one() -> bool:
     except Exception:
         logger.exception("图片任务归档失败 task_id=%s", task_id)
         with SessionLocal() as db:
-            fail_task(db, user_id, task_id, "生成结果归档失败，请稍后重试", refund=False)
+            fail_task(
+                db, user_id, task_id, "生成结果归档失败，请稍后重试", refund=False
+            )
     return True
 
 

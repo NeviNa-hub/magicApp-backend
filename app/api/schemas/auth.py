@@ -35,7 +35,7 @@ class LoginInput(BaseModel):
     account: str = Field(min_length=3, max_length=64, pattern=r"^[A-Za-z0-9_]+$")
     password: str = Field(min_length=8, max_length=128)
 
-
+# 登录成功数据格式
 class LoginResult(BaseModel):
     """登录成功后返回的会话令牌和用户资料。"""
 
@@ -45,3 +45,9 @@ class LoginResult(BaseModel):
     user_id: int
     username: str
     account: str
+
+# 删除账号接口数据格式
+class DeleteAccountInput(BaseModel):
+    """输入当前密码以确认永久注销。"""
+
+    password: str = Field(min_length=1, max_length=128)

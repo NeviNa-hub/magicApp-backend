@@ -10,6 +10,7 @@ from app.api.schemas.library import (
     LibraryResult,
 )
 from app.core.errors import ApiError
+from app.db.models.asset import Asset
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 
@@ -18,7 +19,7 @@ CREATING_STATUSES = ("pending", "processing")
 # 用户取消的任务单独展示，避免与未提交的编辑草稿混淆。
 CANCELED_STATUSES = ("canceled",)
 
-
+# 作品库查询服务
 def get_library(
     db: Session,
     user_id: int,
@@ -42,7 +43,7 @@ def get_library(
         lists=items,
     )
 
-
+# 作品库查询服务
 def _build_filtered_query(
     user_id: int, status: str, keyword: str, work_type: str
 ) -> Subquery:
@@ -166,6 +167,7 @@ def _get_page_items(
                     ),
                     created_at=work.created_at,
                     media_url=work.media_url,
+                    cover_asset_id=work.cover_asset_id,
                 )
             )
         elif row.kind == "task" and row.id in tasks_by_id:
@@ -191,7 +193,7 @@ def _get_page_items(
             )
     return items
 
-
+# 作品删除服务
 def delete_work(db: Session, user_id: int, work_id: int) -> None:
     """删除本人作品；不存在或不属于本人时统一按不存在处理，避免暴露他人数据。"""
     work = db.scalar(select(Work).where(Work.id == work_id, Work.user_id == user_id))
@@ -201,7 +203,7 @@ def delete_work(db: Session, user_id: int, work_id: int) -> None:
     db.delete(work)
     db.commit()
 
-
+# 作品标题更新服务
 def update_work_title(db: Session, user_id: int, work_id: int, title: str) -> Work:
     """修改本人已完成作品的标题，不暴露其他用户的作品。"""
     work = db.scalar(
@@ -216,7 +218,7 @@ def update_work_title(db: Session, user_id: int, work_id: int, title: str) -> Wo
     db.refresh(work)
     return work
 
-
+# 作品媒体查询服务
 def get_work_media(db: Session, user_id: int, work_id: int) -> Work:
     """读取本人已完成作品的媒体地址，不暴露其他用户的作品。"""
     work = db.scalar(
@@ -226,4 +228,34 @@ def get_work_media(db: Session, user_id: int, work_id: int) -> Work:
     )
     if work is None or not work.media_url:
         raise ApiError(message="作品媒体不存在", status_code=404)
+    return work
+
+# 作品封面更新服务
+def update_video_cover(
+    db: Session, user_id: int, work_id: int, asset_id: int | None
+) -> Work:
+    """仅允许给本人已完成视频设置本人上传的图片。"""
+    work = db.scalar(
+        select(Work).where(
+            Work.id == work_id,
+            Work.user_id == user_id,
+            Work.status == "completed",
+            Work.media_type == "video",
+        )
+    )
+    if work is None:
+        raise ApiError(message="视频作品不存在", status_code=404)
+    if asset_id is not None:
+        asset = db.scalar(
+            select(Asset).where(Asset.id == asset_id, Asset.user_id == user_id)
+        )
+        if asset is None or asset.content_type not in (
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        ):
+            raise ApiError(message="封面图片不存在", status_code=404)
+    work.cover_asset_id = asset_id
+    db.commit()
+    db.refresh(work)
     return work

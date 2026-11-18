@@ -24,7 +24,7 @@ CJK_PATTERN = re.compile(
     r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]"
 )
 
-
+# 查询创作积分报价接口数据格式
 @dataclass(frozen=True)
 class TaskQuote:
     """一次创作任务的 token 与积分报价。"""
@@ -47,7 +47,7 @@ class TaskQuote:
             "points_per_1k_tokens": self.points_per_1k_tokens,
         }
 
-
+# 估算文本 token 数
 def estimate_text_tokens(text: str) -> int:
     """估算文本 token 数：中日韩字符约 1 字 1 token，其余按 4 字符 1 token。"""
     if not text:
@@ -56,12 +56,18 @@ def estimate_text_tokens(text: str) -> int:
     cjk_count = len(CJK_PATTERN.findall(text))
     return cjk_count + math.ceil((len(text) - cjk_count) / 4)
 
-
-def quote_task(task_type: str, prompt: str = "", style: str = "") -> TaskQuote:
+# 查询创作积分报价接口
+def quote_task(
+    task_type: str, prompt: str = "", style: str = "", duration: int = 5
+) -> TaskQuote:
     """按任务类型、提示词和画风计算 token 与积分。"""
     output_tokens = OUTPUT_TOKEN_BUDGETS.get(task_type)
     if output_tokens is None:
         raise ValueError(f"不支持的任务类型：{task_type}")
+
+    # 视频输出预算以 5 秒为基准按时长等比例估算，非第三方实际 token。
+    if task_type == "video":
+        output_tokens = math.ceil(output_tokens * duration / 5)
 
     input_tokens = estimate_text_tokens(prompt) + estimate_text_tokens(style)
     total_tokens = input_tokens + output_tokens

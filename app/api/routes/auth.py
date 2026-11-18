@@ -8,8 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_session
-from app.api.schemas.auth import LoginInput, LoginResult, RegisterInput, RegisterResult
+from app.api.deps import get_current_session, get_current_user
+from app.api.schemas.auth import (
+    DeleteAccountInput,
+    LoginInput,
+    LoginResult,
+    RegisterInput,
+    RegisterResult,
+)
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.core.responses import ApiResponse, success
@@ -18,6 +24,7 @@ from app.db.models.account import DEFAULT_POINTS_BALANCE, Account
 from app.db.models.session_model import UserSession
 from app.db.models.user import User
 from app.db.session import get_db
+from app.services.account_deletion import delete_account
 
 router = APIRouter(prefix="/auth", tags=["账号"])
 
@@ -44,7 +51,9 @@ def login_user(
 
     # 随机令牌只返回给客户端；数据库仅保存其摘要，避免数据库泄露即可直接冒用令牌。
     access_token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=get_settings().session_expire_days)
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        days=get_settings().session_expire_days
+    )
     user_session = UserSession(
         user_id=user.id,
         token_hash=hash_session_token(access_token),
@@ -115,3 +124,14 @@ def logout_user(
     user_session.revoked_at = datetime.now(timezone.utc)
     db.commit()
     return success(message="已退出登录")
+
+# 删除账号接口
+@router.post("/delete-account", response_model=ApiResponse)
+def remove_account(
+    payload: DeleteAccountInput,
+    user: User = Depends(get_current_user),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+) -> ApiResponse:
+    """校验密码后永久删除本人账号与应用内数据。"""
+    delete_account(db, user.id, payload.password)
+    return success(message="账号已注销")

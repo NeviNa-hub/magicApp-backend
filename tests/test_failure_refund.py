@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.deps import get_current_user
 from app.db.models.account import Account, PointLedger
+from app.db.models.file_deletion import PendingFileDeletion
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import get_db
@@ -21,7 +22,7 @@ from app.workers.video_generation import run_one as run_video_task
 
 IMAGE_BODY = {"prompt": "mountain", "style": "ink", "ratio": "1:1"}
 
-
+# 创作失败退款测试
 class FailureRefundTest(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine(
@@ -32,6 +33,7 @@ class FailureRefundTest(unittest.TestCase):
             PointLedger.__table__,
             GenerationTask.__table__,
             Work.__table__,
+            PendingFileDeletion.__table__,
         ):
             table.create(self.engine)
         with Session(self.engine) as db:
@@ -89,7 +91,7 @@ class FailureRefundTest(unittest.TestCase):
             return list(
                 db.scalars(select(PointLedger).where(PointLedger.reason == reason))
             )
-        
+
     # 测试草稿转换为图片任务
     def test_draft_conversion_image(self):
         data = {"prompt": "mountain", "style": "ink", "ratio": "1:1"}
@@ -244,6 +246,31 @@ class FailureRefundTest(unittest.TestCase):
         self.assertEqual(status["refund_points"], 5)
         self.assertEqual(status["retry_cost_points"], 5)
         self.assertEqual(self.balance(), 5)
+
+    def test_current_refund_excludes_previous_attempts(self):
+        """重试重新扣费后，本次未退款不能展示历史退款。"""
+        task_id = self.create_image_task()
+        with patch(
+            "app.workers.image_generation.generate_image",
+            side_effect=ValueError("failed"),
+        ):
+            self.assertTrue(run_image_task())
+        status = self.client.get(f"/api/tasks/{task_id}").json()["data"]
+        self.assertEqual(status["current_refund_points"], 2)
+        self.assertEqual(
+            self.client.post(f"/api/tasks/{task_id}/retry").status_code, 200
+        )
+        with Session(self.engine) as db:
+            task = db.scalar(
+                select(GenerationTask).where(GenerationTask.task_id == task_id)
+            )
+            task.status = "processing"
+            db.commit()
+            fail_task(db, 1, task.id, "archive failure", refund=False)
+        status = self.client.get(f"/api/tasks/{task_id}").json()["data"]
+        self.assertEqual(status["refund_points"], 2)
+        self.assertEqual(status["current_refund_points"], 0)
+        self.assertEqual(status["retry_cost_points"], 0)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.schemas.library import UpdateWorkTitle
+from app.api.schemas.library import UpdateWorkCover, UpdateWorkTitle
 from app.core.responses import ApiResponse, success
 from app.db.models.user import User
 from app.db.session import get_db
@@ -14,12 +14,14 @@ from app.services.library import (
     delete_work,
     get_library,
     get_work_media,
+    update_video_cover,
     update_work_title,
 )
 
 router = APIRouter(prefix="/library", tags=["作品库"])
 
 
+# 查询作品库接口
 @router.get("", response_model=ApiResponse)
 def list_library(
     status: Literal["all", "completed", "creating", "canceled"] = "all",
@@ -38,6 +40,7 @@ def list_library(
     return success(result.model_dump(mode="json"))
 
 
+# 删除作品接口
 @router.delete("/works/{work_id}", response_model=ApiResponse)
 def remove_work(
     work_id: int,
@@ -49,6 +52,7 @@ def remove_work(
     return success({"work_id": work_id})
 
 
+# 更新作品标题接口
 @router.put("/works/{work_id}", response_model=ApiResponse)
 def rename_work(
     work_id: int,
@@ -61,6 +65,7 @@ def rename_work(
     return success({"work_id": work.id, "title": work.title})
 
 
+# 查询作品媒体接口
 @router.get("/works/{work_id}/media", response_model=ApiResponse)
 def read_work_media(
     work_id: int,
@@ -70,5 +75,23 @@ def read_work_media(
     """获取本人作品的原始媒体地址，地址有效期由媒体服务决定。"""
     work = get_work_media(db, user.id, work_id)
     return success(
-        {"work_id": work.id, "media_url": work.media_url, "media_type": work.media_type}
+        {
+            "work_id": work.id,
+            "media_url": work.media_url,
+            "media_type": work.media_type,
+            "cover_asset_id": work.cover_asset_id,
+        }
     )
+
+
+# 更新作品封面接口
+@router.put("/works/{work_id}/cover", response_model=ApiResponse)
+def set_work_cover(
+    work_id: int,
+    body: UpdateWorkCover,
+    user: User = Depends(get_current_user),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+) -> ApiResponse:
+    """设置或移除本人视频作品封面。"""
+    work = update_video_cover(db, user.id, work_id, body.cover_asset_id)
+    return success({"work_id": work.id, "cover_asset_id": work.cover_asset_id})

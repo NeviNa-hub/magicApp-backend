@@ -7,18 +7,22 @@ from app.db.base import Base
 from app.db.models.base import TimestampMixin
 from app.db.models.enums import WORK_STATUS_CHECK_SQL
 
-
+# 作品模型
 class Work(TimestampMixin, Base):
     """保存作品信息，并关联生成来源任务。"""
 
     __tablename__ = "works"
 
+    """作品库中的用户作品。"""
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     task_id: Mapped[int | None] = mapped_column(
         ForeignKey("generation_tasks.id", ondelete="SET NULL"), index=True
+    )
+    cover_asset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
     )
     title: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(24), index=True)

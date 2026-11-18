@@ -52,10 +52,11 @@ def _serialize(draft: GenerationTask) -> dict:
     }
 
 
+# 创建草稿接口
 @router.post("", response_model=ApiResponse)
 def create_draft(
     body: DraftInput,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
     """创建本人未提交的编辑草稿。"""
@@ -77,6 +78,7 @@ def create_draft(
     return success(_serialize(draft))
 
 
+# 查询草稿接口
 @router.get("", response_model=ApiResponse)
 def list_drafts(
     page: int = Query(1, ge=1),
@@ -107,16 +109,18 @@ def list_drafts(
     )
 
 
+# 查询草稿详情接口
 @router.get("/{draft_id}", response_model=ApiResponse)
 def read_draft(
     draft_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
     """查询本人仍可编辑的草稿。"""
     return success(_serialize(_get_draft(db, user.id, draft_id)))
 
 
+# 更新草稿接口
 @router.put("/{draft_id}", response_model=ApiResponse)
 def update_draft(
     draft_id: str,
@@ -139,10 +143,11 @@ def update_draft(
     return success(_serialize(draft))
 
 
+# 删除草稿接口
 @router.delete("/{draft_id}", response_model=ApiResponse)
 def delete_draft(
     draft_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> ApiResponse:
     """删除本人未提交的草稿。"""

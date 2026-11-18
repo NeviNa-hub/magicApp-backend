@@ -8,15 +8,18 @@ from sqlalchemy import func, select
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import SessionLocal
+from app.services.file_deletions import cleanup_pending_file_deletions
 from app.services.siliconflow_video import get_video_status, submit_video
 from app.services.tasks import fail_task
 
 logger = logging.getLogger(__name__)
 
 
+# 视频任务处理函数
 def run_one() -> bool:
     """领取待提交任务，或继续查询已提交的视频。"""
     with SessionLocal() as db:
+        cleanup_pending_file_deletions(db, limit=5)
         task = db.scalar(
             select(GenerationTask)
             .where(
@@ -67,9 +70,7 @@ def run_one() -> bool:
         if status == "Failed":
             # 第三方明确失败且未产出视频，按未计费处理并退回本次扣费。
             with SessionLocal() as db:
-                fail_task(
-                    db, user_id, task_id, "视频生成失败，请稍后重试", refund=True
-                )
+                fail_task(db, user_id, task_id, "视频生成失败，请稍后重试", refund=True)
             return True
         with SessionLocal() as db:
             task = db.get(GenerationTask, task_id, with_for_update=True)

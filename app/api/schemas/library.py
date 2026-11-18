@@ -12,7 +12,7 @@ class LibraryPageInfo(BaseModel):
     page_size: int = Field(description="每页条数")
     total: int = Field(description="当前筛选状态的总条数")
 
-
+# 作品库项数据格式
 class LibraryItem(BaseModel):
     """一条已完成作品、创作中任务或已取消任务。"""
 
@@ -24,16 +24,17 @@ class LibraryItem(BaseModel):
     status: str = Field(description="completed、creating 或 canceled")
     type_name: str = Field(description="创作类型名称")
     created_at: datetime = Field(description="作品或任务的创建时间")
+    cover_asset_id: int | None = None
     media_url: str | None = Field(description="结果媒体地址；可能过期，创作中为空")
 
-
+# 作品库分页响应数据格式
 class LibraryResult(BaseModel):
     """作品库分页响应。"""
 
     page_info: LibraryPageInfo
     lists: list[LibraryItem]
 
-
+# 修改作品标题接口数据格式
 class UpdateWorkTitle(BaseModel):
     """修改作品标题的请求。"""
 
@@ -44,3 +45,9 @@ class UpdateWorkTitle(BaseModel):
     def trim_title(cls, value: object) -> object:
         """去掉标题首尾空白，再执行长度校验。"""
         return value.strip() if isinstance(value, str) else value
+
+# 修改作品封面接口数据格式
+class UpdateWorkCover(BaseModel):
+    """选择本人上传的图片作为视频封面，null 表示移除。"""
+
+    cover_asset_id: int | None = Field(ge=1)

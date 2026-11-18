@@ -19,7 +19,7 @@ from app.services.tasks import (
 
 router = APIRouter(prefix="/tasks", tags=["任务"])
 
-
+# 任务结果组装函数
 def _build_task_result(db: Session, task: GenerationTask) -> dict:
     """按任务状态组装响应；结果地址仅在任务完成后返回。"""
     result = task.result_data if isinstance(task.result_data, dict) else {}
@@ -29,7 +29,9 @@ def _build_task_result(db: Session, task: GenerationTask) -> dict:
     # 原图仍由上传接口校验归属，不在任务接口公开文件内容。
     source = task.input_data if isinstance(task.input_data, dict) else {}
     upload_id = source.get("upload_id") if task.task_type == "optimization" else None
-    original_upload_id = upload_id if isinstance(upload_id, str) and upload_id.isdigit() else None
+    original_upload_id = (
+        upload_id if isinstance(upload_id, str) and upload_id.isdigit() else None
+    )
     net_paid, refunded = task_billing_state(db, task)
     return TaskResult(
         task_id=task.task_id,
@@ -41,10 +43,17 @@ def _build_task_result(db: Session, task: GenerationTask) -> dict:
         error_message=task.error_message if task.status == "failed" else None,
         cost_points=task.cost_points,
         refund_points=refunded,
+        # 扣费与退款同事务到账；净支付可区分历史退款和本次退款。
+        current_refund_points=(
+            min(refunded, max(task.cost_points - net_paid, 0))
+            if task.status in ("failed", "canceled")
+            else 0
+        ),
         retry_cost_points=get_retry_cost(task, net_paid, refunded),
     ).model_dump()
 
 
+# 查询任务接口
 @router.get("/{task_id}", response_model=ApiResponse)
 def get_task(
     task_id: str,
@@ -55,6 +64,7 @@ def get_task(
     return success(_build_task_result(db, get_user_task(db, user.id, task_id)))
 
 
+# 取消任务接口
 @router.post("/{task_id}/cancel", response_model=ApiResponse)
 def cancel_task(
     task_id: str,
@@ -65,6 +75,7 @@ def cancel_task(
     return success(_build_task_result(db, cancel_user_task(db, user.id, task_id)))
 
 
+# 重试任务接口
 @router.post("/{task_id}/retry", response_model=ApiResponse)
 def retry_task(
     task_id: str,
