@@ -61,6 +61,15 @@ class LibraryTest(unittest.TestCase):
                         input_data={"prompt": "已取消的草稿"},
                         cost_points=2,
                     ),
+                    GenerationTask(
+                        id=7,
+                        task_id="editable-draft",
+                        user_id=1,
+                        task_type="video",
+                        status="draft",
+                        input_data={"prompt": "待继续编辑的视频草稿"},
+                        cost_points=0,
+                    ),
                     Work(
                         id=1,
                         user_id=1,
@@ -95,7 +104,7 @@ class LibraryTest(unittest.TestCase):
 
     def test_filter_pagination_and_isolation(self):
         data = self.client.get("/api/library?page_size=1").json()["data"]
-        self.assertEqual(data["page_info"]["total"], 3)
+        self.assertEqual(data["page_info"]["total"], 4)
         self.assertNotIn("tabs", data)
         second = self.client.get("/api/library?page_size=1&page=2").json()["data"]
         self.assertNotEqual(data["lists"][0]["work_id"], second["lists"][0]["work_id"])
@@ -109,6 +118,10 @@ class LibraryTest(unittest.TestCase):
         self.assertEqual(draft["lists"][0]["task_id"], "draft")
         self.assertEqual(draft["lists"][0]["title"], "已取消的草稿")
         self.assertEqual(draft["lists"][0]["status"], "canceled")
+        editable_draft = self.client.get("/api/library?status=draft").json()["data"]
+        self.assertEqual(editable_draft["page_info"]["total"], 1)
+        self.assertEqual(editable_draft["lists"][0]["task_id"], "editable-draft")
+        self.assertEqual(editable_draft["lists"][0]["status"], "draft")
         self.assertEqual(
             self.client.get("/api/library?status=completed").json()["data"]["lists"][0][
                 "title"
@@ -148,7 +161,7 @@ class LibraryTest(unittest.TestCase):
         video = self.client.get(
             "/api/library", params={"type": "video", "sort": "oldest"}
         ).json()["data"]
-        self.assertEqual(video["page_info"]["total"], 1)
+        self.assertEqual(video["page_info"]["total"], 2)
         self.assertEqual(video["lists"][0]["task_id"], "video")
         self.assertEqual(self.client.get("/api/library?sort=invalid").status_code, 422)
 
@@ -158,15 +171,15 @@ class LibraryTest(unittest.TestCase):
             self.client.get(
                 "/api/library", params={"page": page, "page_size": 1}
             ).json()["data"]["lists"][0]["work_id"]
-            for page in range(1, 4)
+            for page in range(1, 5)
         ]
         oldest = [
             self.client.get(
                 "/api/library", params={"page": page, "page_size": 1, "sort": "oldest"}
             ).json()["data"]["lists"][0]["work_id"]
-            for page in range(1, 4)
+            for page in range(1, 5)
         ]
-        self.assertEqual(set(newest), {1, -1, -4})
+        self.assertEqual(set(newest), {1, -1, -4, -7})
         self.assertEqual(set(oldest), set(newest))
         for order in (newest, oldest):
             self.assertEqual(len(order), len(set(order)))

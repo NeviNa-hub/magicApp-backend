@@ -24,7 +24,7 @@ router = APIRouter(prefix="/library", tags=["作品库"])
 # 查询作品库接口
 @router.get("", response_model=ApiResponse)
 def list_library(
-    status: Literal["all", "completed", "creating", "canceled"] = "all",
+    status: Literal["all", "completed", "creating", "canceled", "draft"] = "all",
     keyword: str = Query(default="", max_length=255),
     work_type: Literal["all", "image", "optimization", "video"] = Query(
         default="all", alias="type"

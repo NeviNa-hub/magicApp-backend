@@ -18,6 +18,8 @@ TYPE_NAMES = {"image": "文字生图", "optimization": "图片优化", "video": 
 CREATING_STATUSES = ("pending", "processing")
 # 用户取消的任务单独展示，避免与未提交的编辑草稿混淆。
 CANCELED_STATUSES = ("canceled",)
+DRAFT_STATUSES = ("draft",)
+
 
 # 作品库查询服务
 def get_library(
@@ -30,7 +32,7 @@ def get_library(
     work_type: str = "all",
     sort: str = "newest",
 ) -> LibraryResult:
-    """查询本人创作中任务、已取消任务与已完成作品，返回筛选后的总数和当前页。"""
+    """查询本人作品、创作中任务、已取消任务和编辑草稿。"""
     query = _build_filtered_query(user_id, status, keyword.strip(), work_type)
     total = db.scalar(select(func.count()).select_from(query)) or 0
     items = (
@@ -42,6 +44,7 @@ def get_library(
         page_info=LibraryPageInfo(page=page, page_size=page_size, total=total),
         lists=items,
     )
+
 
 # 作品库查询服务
 def _build_filtered_query(
@@ -81,11 +84,16 @@ def _build_filtered_query(
         tasks = tasks.where(prompt.icontains(keyword, autoescape=True))
     creating = tasks.where(GenerationTask.status.in_(CREATING_STATUSES))
     canceled = tasks.where(GenerationTask.status.in_(CANCELED_STATUSES))
+    drafts = tasks.where(GenerationTask.status.in_(DRAFT_STATUSES))
     if status == "all":
-        return union_all(works, creating, canceled).subquery()
+        return union_all(works, creating, canceled, drafts).subquery()
     if status == "completed":
         return works.subquery()
-    return (canceled if status == "canceled" else creating).subquery()
+    if status == "canceled":
+        return canceled.subquery()
+    if status == "draft":
+        return drafts.subquery()
+    return creating.subquery()
 
 
 def _get_page_items(
@@ -136,8 +144,10 @@ def _get_page_items(
         task_statuses = CANCELED_STATUSES
     elif status == "creating":
         task_statuses = CREATING_STATUSES
+    elif status == "draft":
+        task_statuses = DRAFT_STATUSES
     else:
-        task_statuses = CREATING_STATUSES + CANCELED_STATUSES
+        task_statuses = CREATING_STATUSES + CANCELED_STATUSES + DRAFT_STATUSES
     tasks_by_id = (
         {
             task.id: task
@@ -184,7 +194,9 @@ def _get_page_items(
                     task_id=task.task_id,
                     title=str(prompt)[:255] if prompt else "未命名任务",
                     status=(
-                        "creating" if task.status in CREATING_STATUSES else "canceled"
+                        "creating"
+                        if task.status in CREATING_STATUSES
+                        else "canceled" if task.status in CANCELED_STATUSES else "draft"
                     ),
                     type_name=TYPE_NAMES.get(task.task_type, "创作任务"),
                     created_at=task.created_at,
@@ -192,6 +204,7 @@ def _get_page_items(
                 )
             )
     return items
+
 
 # 作品删除服务
 def delete_work(db: Session, user_id: int, work_id: int) -> None:
@@ -202,6 +215,7 @@ def delete_work(db: Session, user_id: int, work_id: int) -> None:
     # 只删除作品记录，来源任务与积分流水保留，便于追溯创作历史。
     db.delete(work)
     db.commit()
+
 
 # 作品标题更新服务
 def update_work_title(db: Session, user_id: int, work_id: int, title: str) -> Work:
@@ -218,6 +232,7 @@ def update_work_title(db: Session, user_id: int, work_id: int, title: str) -> Wo
     db.refresh(work)
     return work
 
+
 # 作品媒体查询服务
 def get_work_media(db: Session, user_id: int, work_id: int) -> Work:
     """读取本人已完成作品的媒体地址，不暴露其他用户的作品。"""
@@ -229,6 +244,7 @@ def get_work_media(db: Session, user_id: int, work_id: int) -> Work:
     if work is None or not work.media_url:
         raise ApiError(message="作品媒体不存在", status_code=404)
     return work
+
 
 # 作品封面更新服务
 def update_video_cover(

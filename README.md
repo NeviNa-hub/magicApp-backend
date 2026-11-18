@@ -102,6 +102,13 @@ sudo systemctl status magicapp-api --no-pager
 curl -i --max-time 5 http://127.0.0.1:8001/api/ready
 ```
 
+修改 Nginx 配置或发现前端代理连接被拒绝时，重启并检查 Nginx：
+
+```bash
+sudo systemctl restart nginx
+sudo systemctl status nginx --no-pager
+```
+
 查看服务错误：
 
 ```bash
