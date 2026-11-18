@@ -17,12 +17,11 @@ LIMITS = {"image": 400, "optimization": 200, "video": 1000}
 
 
 # 提示词优化输入模型
-@router.model_validate()
 class PromptInput(BaseModel):
     """创作类型和待优化文本。"""
 
     task_type: Literal["image", "optimization", "video"]
-    prompt: str = Field(min_length=1, max_length=800)
+    prompt: str = Field(min_length=1, max_length=1000)
 
     @field_validator("prompt", mode="before")
     @classmethod
