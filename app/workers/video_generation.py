@@ -2,9 +2,12 @@
 
 import logging
 import time
+from datetime import datetime, timezone
+from urllib.error import HTTPError
 
 from sqlalchemy import func, select
 
+from app.core.config import get_settings
 from app.db.models.task import GenerationTask
 from app.db.models.work import Work
 from app.db.session import SessionLocal
@@ -15,11 +18,37 @@ from app.services.tasks import fail_task
 logger = logging.getLogger(__name__)
 
 
+def mark_submission_unknown(task_id: int) -> None:
+    """终止无法确认上游结果的任务，保留核查标记，防止重复提交计费。"""
+    with SessionLocal() as db:
+        task = db.get(GenerationTask, task_id, with_for_update=True)
+        if task and task.status == "processing" and not (task.result_data or {}).get("provider_id"):
+            task.status = "failed"
+            task.error_message = "视频提交结果暂无法确认，请联系管理员核查。"
+            task.result_data = {**(task.result_data or {}), "submission_unknown": True}
+            db.commit()
+
+
 # 视频任务处理函数
 def run_one() -> bool:
     """领取待提交任务，或继续查询已提交的视频。"""
     with SessionLocal() as db:
         cleanup_pending_file_deletions(db, limit=5)
+        # 兼容旧任务，并给仍在提交中的其他 worker 留出网络超时和保存窗口。
+        cutoff_seconds = get_settings().siliconflow_timeout_seconds + 60
+        stale = db.scalars(
+            select(GenerationTask).where(
+                GenerationTask.task_type == "video",
+                GenerationTask.status == "processing",
+                GenerationTask.result_data["provider_id"].as_string().is_(None),
+            )
+        ).all()
+        for item in stale:
+            updated = item.updated_at
+            if updated.tzinfo is None:
+                updated = updated.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - updated).total_seconds() > cutoff_seconds:
+                mark_submission_unknown(item.id)
         task = db.scalar(
             select(GenerationTask)
             .where(
@@ -60,7 +89,16 @@ def run_one() -> bool:
                 if task and task.status == "processing":
                     task.result_data = {"provider_id": provider_id}
                     db.commit()
+        except HTTPError as error:
+            if error.code in {400, 401, 402, 403, 404, 422, 429}:
+                logger.error("视频提交被拒绝 task_id=%s http_status=%s", task_id, error.code)
+                with SessionLocal() as db:
+                    fail_task(db, user_id, task_id, "视频服务拒绝请求，请联系管理员检查配置或额度。", refund=True)
+            else:
+                mark_submission_unknown(task_id)
+            return True
         except Exception:
+            mark_submission_unknown(task_id)
             # 提交结果未知时禁止自动重发，防止第三方重复计费。
             logger.exception("视频提交状态未知 task_id=%s，需人工核查", task_id)
             return True

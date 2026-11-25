@@ -165,6 +165,9 @@ def retry_user_task(db: Session, user_id: int, task_id: str) -> GenerationTask:
     if task.status != "failed":
         raise ApiError(message="只有创作失败的任务可以重试", status_code=409)
 
+    if (task.result_data or {}).get("submission_unknown"):
+        raise ApiError(message="视频提交结果尚未确认，请联系管理员核查后再重试", status_code=409)
+
     # 未退款的失败重试免费，保证模型已计费时用户仍能拿到结果。
     net_paid, refunded = task_billing_state(db, task)
     retry_cost = get_retry_cost(task, net_paid, refunded)
