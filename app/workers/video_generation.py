@@ -1,5 +1,6 @@
 """文字视频后台进程：python -m app.workers.video_generation。"""
 
+import json
 import logging
 import time
 from datetime import datetime, timezone
@@ -137,6 +138,23 @@ def run_one() -> bool:
                 task.status, task.progress = "completed", 100
             task.updated_at = func.now()
             db.commit()
+    except HTTPError as error:
+        try:
+            body = json.loads(error.read())
+        except (ValueError, UnicodeDecodeError):
+            body = {}
+        if error.code == 404 and isinstance(body, dict) and body.get("code") == 20063:
+            # 上游记录已不可查询，结束轮询；计费未知，保留标识供人工核查。
+            with SessionLocal() as db:
+                task = db.get(GenerationTask, task_id, with_for_update=True)
+                if task and task.status == "processing":
+                    task.status = "failed"
+                    task.error_message = "上游视频任务不存在或已过期，请联系管理员核查生成及计费结果。"
+                    task.result_data = {**(task.result_data or {}), "submission_unknown": True}
+                    db.commit()
+            logger.warning("视频任务上游记录失效 task_id=%s provider_code=20063", task_id)
+        else:
+            logger.warning("视频状态查询暂不可用 task_id=%s http_status=%s", task_id, error.code)
     except Exception:
         # 查询失败不代表任务失败，下次继续使用已保存的 requestId 查询。
         logger.exception("视频状态查询失败 task_id=%s", task_id)

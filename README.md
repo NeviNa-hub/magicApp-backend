@@ -114,3 +114,9 @@ sudo systemctl status nginx --no-pager
 ```bash
 sudo journalctl -u magicapp-api -n 100 --no-pager
 ```
+
+
+### git 推送
+git config --local http.proxy http://127.0.0.1:7890
+git config --local https.proxy http://127.0.0.1:7890
+git push origin main
